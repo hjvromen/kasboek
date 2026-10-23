@@ -216,7 +216,7 @@ const IS_WEB = /^https?:$/.test(location.protocol);
 let installPrompt = null;
 const isInstalledApp = () => window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: window-controls-overlay)').matches);
 if (IS_WEB) {
-  for (const [rel, href] of [['manifest', 'manifest.webmanifest'], ['icon', 'icons/favicon-32.png'], ['apple-touch-icon', 'icons/apple-touch-icon.png']]) {
+  for (const [rel, href] of [['manifest', 'manifest.webmanifest'], ['icon', 'favicon-32.png'], ['apple-touch-icon', 'apple-touch-icon.png']]) {
     const l = document.createElement('link'); l.rel = rel; l.href = href; document.head.appendChild(l);
   }
   const tc = document.createElement('meta'); tc.name = 'theme-color'; tc.content = '#2a78d6'; document.head.appendChild(tc);

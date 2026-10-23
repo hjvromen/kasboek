@@ -2,8 +2,8 @@
    Keeps a copy of the program so Kasboek also starts without internet.
    When online, the newest version of the program is fetched first, so updates arrive by themselves.
    Your financial data is never sent anywhere: it is not handled by this file at all. */
-const CACHE = 'kasboek-v1';
-const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png'];
+const CACHE = 'kasboek-v2';
+const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png', 'favicon-32.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
