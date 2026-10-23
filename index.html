@@ -1,0 +1,2078 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kasboek</title>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f6f5f2; --side:#efeee9; --surface:#fcfcfb; --surface-2:#f3f2ee; --hover:rgba(11,11,11,.05);
+  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781; --line:#e1e0d9; --line-strong:#c3c2b7;
+  --accent:#2a78d6; --accent-ink:#fff; --accent-soft:#e3eefb;
+  --neg:#b42318; --pos:#006300; --warn-bg:#fff4dc; --warn-ink:#6b4400; --warn-line:#f2d49a;
+  --s1:#2a78d6; --s2:#eb6834; --grid:#e1e0d9; --axis:#c3c2b7;
+  --shadow:0 1px 2px rgba(0,0,0,.06),0 12px 32px rgba(0,0,0,.10);
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme:dark;
+    --bg:#121211; --side:#1a1a19; --surface:#1f1f1e; --surface-2:#262624; --hover:rgba(255,255,255,.06);
+    --ink:#f0efec; --ink-2:#c3c2b7; --muted:#959389; --line:#2f2f2c; --line-strong:#45453f;
+    --accent:#3987e5; --accent-ink:#fff; --accent-soft:#1d3047;
+    --neg:#f07a7a; --pos:#4cc24c; --warn-bg:#3a2e14; --warn-ink:#f5d58e; --warn-line:#5a4720;
+    --s1:#3987e5; --s2:#d95926; --grid:#2c2c2a; --axis:#45453f;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#121211; --side:#1a1a19; --surface:#1f1f1e; --surface-2:#262624; --hover:rgba(255,255,255,.06);
+  --ink:#f0efec; --ink-2:#c3c2b7; --muted:#959389; --line:#2f2f2c; --line-strong:#45453f;
+  --accent:#3987e5; --accent-ink:#fff; --accent-soft:#1d3047;
+  --neg:#f07a7a; --pos:#4cc24c; --warn-bg:#3a2e14; --warn-ink:#f5d58e; --warn-line:#5a4720;
+  --s1:#3987e5; --s2:#d95926; --grid:#2c2c2a; --axis:#45453f;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:260px minmax(0,1fr);height:100vh}
+.side{background:var(--side);border-right:1px solid var(--line);overflow:auto;padding:14px 10px 20px;display:flex;flex-direction:column;gap:1px}
+.brand{font-weight:700;font-size:19px;padding:6px 10px 14px;display:flex;align-items:center;gap:9px;letter-spacing:-.01em}
+.brand svg{flex:none}
+.nav{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border-radius:8px;border:0;background:none;text-align:left;cursor:pointer;min-height:36px}
+.nav:hover{background:var(--hover)}
+.nav.on{background:var(--accent);color:var(--accent-ink)}
+.nav.on .amt{color:var(--accent-ink)}
+.nav svg{flex:none;opacity:.85}
+.nav .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav .amt{margin-left:auto;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2);white-space:nowrap;padding-left:8px}
+.nav .amt.neg{color:var(--neg)}
+.nav.on .amt.neg{color:var(--accent-ink)}
+.side h3{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:16px 10px 4px;font-weight:600}
+.side .addacc{color:var(--accent);font-size:14px}
+.side .foot{margin-top:auto;padding:16px 10px 0;font-size:12px;color:var(--muted)}
+main{overflow:auto;min-width:0}
+.page{max-width:1120px;margin:0 auto;padding:26px 30px 70px}
+h1{font-size:26px;margin:0;letter-spacing:-.015em;font-weight:700}
+h2{font-size:17px;margin:0 0 12px;font-weight:650}
+.sub{color:var(--ink-2);margin:4px 0 0}
+.head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.head .grow{flex:1;min-width:200px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:7px 14px;cursor:pointer;min-height:36px;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.primary:disabled{opacity:.45;cursor:default;filter:none}
+.btn.danger{color:var(--neg);border-color:var(--line-strong)}
+.btn.small{padding:4px 10px;min-height:30px;font-size:14px}
+.btn.link{border:0;background:none;color:var(--accent);padding:4px 6px;min-height:0}
+.btn.link:hover{text-decoration:underline;background:none}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.cards{display:grid;gap:16px}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.hero{font-size:34px;font-weight:700;letter-spacing:-.02em}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.tile{background:var(--surface-2);border-radius:10px;padding:12px 14px}
+.tile .k{font-size:13px;color:var(--ink-2)}
+.tile .v{font-size:21px;font-weight:650;margin-top:2px}
+.neg{color:var(--neg)}
+.muted{color:var(--muted)}
+.hint{color:var(--muted);font-weight:400;font-size:13px}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.banner{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);border-radius:10px;padding:10px 14px;margin-bottom:16px}
+.banner .grow{flex:1;min-width:200px}
+.note{background:var(--accent-soft);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:14px}
+table.t{width:100%;border-collapse:collapse}
+table.t th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line-strong);background:var(--surface);position:sticky;top:0;z-index:1}
+table.t td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t tr.click{cursor:pointer}
+table.t tr.click:hover td{background:var(--hover)}
+table.t tfoot td{font-weight:650;border-top:1px solid var(--line-strong);border-bottom:0}
+table.t th.num{text-align:right}
+.reg td.memo{color:var(--ink-2);font-size:13px;display:block;padding:0;border:0}
+.reg .cat{color:var(--ink-2)}
+.reg .st{width:34px;text-align:center}
+.stbtn{border:1px solid transparent;background:none;border-radius:6px;width:26px;height:24px;cursor:pointer;color:var(--muted);font-weight:600;font-size:13px}
+.stbtn:hover{border-color:var(--line-strong)}
+.stbtn.c{color:var(--accent)}
+.stbtn.R{color:var(--ink);cursor:default}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.toolbar .grow{flex:1}
+input[type=text],input[type=search],input[type=date],input:not([type]),select,textarea{border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:7px 10px;min-height:36px;width:100%}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.toolbar input,.toolbar select{width:auto}
+.toolbar input[type=search]{min-width:220px}
+label{display:block;font-size:14px;font-weight:550;margin-bottom:12px}
+label>input,label>select,label>.row{margin-top:4px}
+.row{display:flex;gap:8px;align-items:center}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:9px;padding:2px;margin-bottom:14px;background:var(--surface-2);flex-wrap:wrap}
+.seg button{border:0;background:none;padding:6px 14px;border-radius:7px;cursor:pointer}
+.seg button.on{background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.15);font-weight:600}
+.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;z-index:50;overflow:auto}
+.modal{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);width:min(520px,100%);border:1px solid var(--line)}
+.modal.wide{width:min(760px,100%)}
+.modal-head{display:flex;align-items:center;padding:16px 20px 4px}
+.modal-head h2{margin:0;flex:1}
+.modal-body{padding:12px 20px 18px}
+.modal-actions{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.spacer{flex:1}
+.icon-btn{border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:var(--muted);width:32px;height:32px;border-radius:8px}
+.icon-btn:hover{background:var(--hover)}
+.err{color:var(--neg);font-size:14px;min-height:0}
+.err:not(:empty){margin:4px 0 10px}
+.splits{width:100%;border-collapse:collapse;margin:4px 0 6px}
+.splits td{padding:3px 4px 3px 0}
+.splits select{min-width:0}
+.splits .amt input{width:110px;text-align:right}
+.splitsum{font-size:14px;color:var(--ink-2);display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.hbars{display:flex;flex-direction:column;gap:2px}
+.hbar{display:grid;grid-template-columns:minmax(90px,200px) minmax(40px,1fr) auto 40px;gap:12px;align-items:center;border:0;background:none;padding:6px 6px;border-radius:7px;text-align:left;cursor:default;width:100%}
+.hbar.drill{cursor:pointer}
+.hbar.drill:hover{background:var(--hover)}
+.hb-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb-track{display:block;height:14px;position:relative}
+.hb-fill{position:absolute;left:0;top:0;bottom:0;background:var(--s1);border-radius:0 4px 4px 0;min-width:2px}
+.hb-val{text-align:right;font-variant-numeric:tabular-nums}
+.hb-pct{text-align:right;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--ink-2);margin-bottom:6px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-size:12px;fill:var(--muted);font-variant-numeric:tabular-nums}
+#tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);box-shadow:var(--shadow);border-radius:8px;padding:8px 10px;font-size:13px;z-index:100;display:none;max-width:260px;line-height:1.5}
+#tip b{font-weight:650}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px;border-bottom:1px solid var(--line)}
+.tabs button{border:0;background:none;padding:8px 12px;border-bottom:2px solid transparent;cursor:pointer;color:var(--ink-2);margin-bottom:-1px}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+.crumbs{font-size:14px;margin-bottom:10px;color:var(--ink-2)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:200;box-shadow:var(--shadow);font-size:14px}
+.recon{position:sticky;top:0;z-index:3;background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center}
+.recon .k{font-size:12px;color:var(--ink-2)}
+.recon .v{font-weight:650;font-variant-numeric:tabular-nums}
+.welcome{max-width:640px;margin:8vh auto 0;text-align:center}
+.welcome .big{display:grid;gap:12px;margin-top:26px;text-align:left}
+.bigbtn{display:block;width:100%;text-align:left;border:1px solid var(--line-strong);background:var(--surface);border-radius:12px;padding:16px 18px;cursor:pointer}
+.bigbtn:hover{border-color:var(--accent)}
+.bigbtn b{display:block;font-size:16px;margin-bottom:2px}
+.bigbtn span{color:var(--ink-2);font-size:14px}
+.steps{padding-left:20px;margin:6px 0 0}
+.steps li{margin-bottom:6px}
+details summary{cursor:pointer;color:var(--accent)}
+.catrow{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px}
+.catrow:hover{background:var(--hover)}
+.catrow .nm{flex:1}
+.catrow.child{padding-left:30px}
+.catrow .acts{display:flex;gap:2px;opacity:.75}
+.catrow:hover .acts{opacity:1}
+.pill{font-size:12px;border-radius:20px;padding:1px 8px;background:var(--surface-2);color:var(--ink-2)}
+.more{display:flex;justify-content:center;padding:14px}
+.status-saved{font-size:12px;color:var(--muted)}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);height:100vh}
+  .side{flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:8px;border-right:0;border-bottom:1px solid var(--line);gap:4px;align-items:center}
+  .side h3,.side .foot,.side .brand span.t{display:none}
+  .brand{padding:0 6px}
+  .nav{width:auto;flex:none}
+  .nav .amt{display:none}
+  .page{padding:18px 14px 60px}
+  .cols2,.tiles,.grid2{grid-template-columns:1fr}
+  .hbar{grid-template-columns:110px 1fr 96px}
+  .hb-pct{display:none}
+  .reg .memo-col,.reg .numcol{display:none}
+}
+@media print{
+  .side,.toolbar,.btn,.tabs,.no-print{display:none!important}
+  .app{display:block;height:auto}
+  main{overflow:visible}
+  body{background:#fff}
+  .card{border:0;padding:0}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="side" id="side"></nav>
+  <main id="main"></main>
+</div>
+<div id="tip"></div>
+<datalist id="payee-list"></datalist>
+<input type="file" id="file-backup" accept=".json,application/json" hidden>
+<input type="file" id="file-qif" accept=".qif,.QIF,text/plain" multiple hidden>
+
+<script>
+"use strict";
+/* ===================================================================
+   Kasboek — a personal money manager that runs in your browser.
+   All data stays on this computer (browser storage + backup files).
+   =================================================================== */
+
+const APP_VERSION = '1.2 (October 2026)';
+
+/* ---------- installable app (when opened from its web address) ---------- */
+const IS_WEB = /^https?:$/.test(location.protocol);
+let installPrompt = null;
+const isInstalledApp = () => window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: window-controls-overlay)').matches);
+if (IS_WEB) {
+  for (const [rel, href] of [['manifest', 'manifest.webmanifest'], ['icon', 'icons/favicon-32.png'], ['apple-touch-icon', 'icons/apple-touch-icon.png']]) {
+    const l = document.createElement('link'); l.rel = rel; l.href = href; document.head.appendChild(l);
+  }
+  const tc = document.createElement('meta'); tc.name = 'theme-color'; tc.content = '#2a78d6'; document.head.appendChild(tc);
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; if (typeof render === 'function' && state && (state.view === 'settings' || state.view === 'home')) render(); });
+  window.addEventListener('appinstalled', () => { installPrompt = null; toast('Kasboek is installed. From now on, open it from the Dock or the Start menu.'); render(); });
+}
+async function installApp() {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  try { await installPrompt.userChoice; } catch (e) {}
+  installPrompt = null; render();
+}
+
+/* ---------- small helpers ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+const pad = n => String(n).padStart(2, '0');
+const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+const isoOf = (y, m, d) => y + '-' + pad(m) + '-' + pad(d);
+
+const ACCOUNT_TYPES = [
+  ['checking', 'Current / checking account'],
+  ['savings', 'Savings account'],
+  ['credit', 'Credit card'],
+  ['cash', 'Cash'],
+  ['asset', 'Other asset (house, car…)'],
+  ['liability', 'Loan / mortgage / other debt'],
+];
+const ACCOUNT_GROUPS = [
+  ['Bank and cash', ['checking', 'savings', 'cash']],
+  ['Credit cards', ['credit']],
+  ['Assets', ['asset']],
+  ['Loans and debts', ['liability']],
+];
+const isDebtType = t => t === 'credit' || t === 'liability';
+
+/* ---------- the data ---------- */
+function emptyDB() {
+  return {
+    app: 'kasboek', version: 1,
+    settings: { currency: 'EUR', locale: 'nl-NL', theme: 'system' },
+    accounts: [], categories: [], transactions: [],
+    seq: 1, lastBackup: null,
+  };
+}
+let DB = emptyDB();
+let _idx = null;
+
+function cmpTx(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : a.seq - b.seq; }
+
+function idx() {
+  if (_idx) return _idx;
+  const acc = new Map(DB.accounts.map(a => [a.id, a]));
+  const cat = new Map(DB.categories.map(c => [c.id, c]));
+  const tx = new Map(DB.transactions.map(t => [t.id, t]));
+  const byAcc = new Map(DB.accounts.map(a => [a.id, []]));
+  const legsOf = new Map();
+  for (const t of DB.transactions) {
+    if (!byAcc.has(t.accountId)) byAcc.set(t.accountId, []);
+    byAcc.get(t.accountId).push(t);
+    if (t.linkId) { if (!legsOf.has(t.linkId)) legsOf.set(t.linkId, []); legsOf.get(t.linkId).push(t); }
+  }
+  const bal = new Map();
+  for (const [id, arr] of byAcc) { arr.sort(cmpTx); bal.set(id, arr.reduce((s, t) => s + t.amount, 0)); }
+  // last transaction per payee (for auto-fill)
+  const payeeLast = new Map();
+  const sources = DB.transactions.filter(t => !t.linkId && !t.ob && t.payee).sort(cmpTx);
+  for (const t of sources) payeeLast.set(t.payee.toLowerCase(), t);
+  const childrenOf = new Map();
+  for (const c of DB.categories) if (c.parentId) { if (!childrenOf.has(c.parentId)) childrenOf.set(c.parentId, []); childrenOf.get(c.parentId).push(c); }
+  for (const arr of childrenOf.values()) arr.sort((a, b) => a.name.localeCompare(b.name));
+  _idx = { acc, cat, tx, byAcc, legsOf, bal, payeeLast, childrenOf };
+  return _idx;
+}
+function changed() { _idx = null; scheduleSave(); }
+
+/* ---------- formatting ---------- */
+let _nf = null, _nfc = null, _df = null, _mf = null;
+function resetFormats() { _nf = _nfc = _df = _mf = null; }
+function money(c) {
+  if (!_nf) _nf = new Intl.NumberFormat(DB.settings.locale, { style: 'currency', currency: DB.settings.currency });
+  return _nf.format((c || 0) / 100);
+}
+function moneyCompact(c) {
+  if (!_nfc) _nfc = new Intl.NumberFormat(DB.settings.locale, { style: 'currency', currency: DB.settings.currency, notation: 'compact', maximumFractionDigits: 1 });
+  return _nfc.format((c || 0) / 100);
+}
+function moneyPlain(c) { // for input fields and CSV, no currency symbol, no grouping
+  return ((c || 0) / 100).toLocaleString(DB.settings.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false });
+}
+function moneyHTML(c) { return `<span class="${c < 0 ? 'neg' : ''}">${esc(money(c))}</span>`; }
+function fmtDate(iso) {
+  if (!iso) return '';
+  if (!_df) _df = new Intl.DateTimeFormat(DB.settings.locale, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+  const [y, m, d] = iso.split('-').map(Number);
+  return _df.format(Date.UTC(y, m - 1, d));
+}
+function fmtMonth(key) {
+  if (!_mf) _mf = new Intl.DateTimeFormat(DB.settings.locale, { month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const [y, m] = key.split('-').map(Number);
+  return _mf.format(Date.UTC(y, m - 1, 15));
+}
+function localeDecimal() { return (1.5).toLocaleString(DB.settings.locale).indexOf(',') >= 0 ? ',' : '.'; }
+
+/* Parse an amount typed by a person: "12,50", "12.50", "1.234,56", "1,234.56", "-8" */
+function parseUserAmount(s) {
+  s = String(s == null ? '' : s).trim();
+  if (!s) return null;
+  const neg = /^-|^\(.*\)$|-$/.test(s);
+  s = s.replace(/[^\d.,]/g, '');
+  if (!s) return null;
+  const lc = s.lastIndexOf(','), ld = s.lastIndexOf('.');
+  let dec = -1;
+  if (lc >= 0 && ld >= 0) dec = Math.max(lc, ld);
+  else if (lc >= 0 || ld >= 0) {
+    const p = Math.max(lc, ld), after = s.length - p - 1, count = (s.match(/[.,]/g) || []).length;
+    if (count === 1 && after !== 3) dec = p;
+    else if (count === 1 && after === 3) dec = (s[p] === localeDecimal()) ? p : -1;
+  }
+  let ip = s, fp = '';
+  if (dec >= 0) { ip = s.slice(0, dec); fp = s.slice(dec + 1); }
+  ip = ip.replace(/[.,]/g, ''); fp = fp.replace(/[.,]/g, '');
+  const v = Math.round(parseFloat((ip || '0') + '.' + (fp || '0')) * 100);
+  if (!isFinite(v)) return null;
+  return neg ? -v : v;
+}
+
+/* ---------- months & periods ---------- */
+function addMonths(key, n) { let [y, m] = key.split('-').map(Number); m += n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return y + '-' + pad(m); }
+function monthsBetween(fromKey, toKey) { const out = []; let k = fromKey; let guard = 0; while (k <= toKey && guard++ < 1200) { out.push(k); k = addMonths(k, 1); } return out; }
+const PERIODS = [
+  ['thisMonth', 'This month'], ['lastMonth', 'Last month'], ['last3', 'Last 3 months'], ['thisYear', 'This year'],
+  ['lastYear', 'Last year'], ['last12', 'Last 12 months'], ['all', 'All dates'], ['custom', 'Custom dates…'],
+];
+function periodRange(p, custom) {
+  const t = todayISO(), y = +t.slice(0, 4), m = +t.slice(5, 7), cur = t.slice(0, 7);
+  switch (p) {
+    case 'thisMonth': return [cur + '-01', cur + '-31'];
+    case 'lastMonth': { const k = addMonths(cur, -1); return [k + '-01', k + '-31']; }
+    case 'last3': return [addMonths(cur, -2) + '-01', cur + '-31'];
+    case 'thisYear': return [y + '-01-01', y + '-12-31'];
+    case 'lastYear': return [(y - 1) + '-01-01', (y - 1) + '-12-31'];
+    case 'last12': return [addMonths(cur, -11) + '-01', cur + '-31'];
+    case 'custom': return [(custom && custom.from) || '0000-01-01', (custom && custom.to) || '9999-12-31'];
+    default: return ['0000-01-01', '9999-12-31'];
+  }
+}
+function periodLabel(p, custom) {
+  if (p === 'custom') return (custom.from ? fmtDate(custom.from) : 'start') + ' – ' + (custom.to ? fmtDate(custom.to) : 'today');
+  return (PERIODS.find(x => x[0] === p) || ['', 'All dates'])[1];
+}
+function dataDateRange() {
+  let lo = null, hi = null;
+  for (const t of DB.transactions) { if (!lo || t.date < lo) lo = t.date; if (!hi || t.date > hi) hi = t.date; }
+  return [lo, hi];
+}
+
+/* ---------- storage: browser database + backup files ---------- */
+let storageMode = 'none', idbHandle = null, saveTimer = null, saveState = 'saved';
+function idbOpen() {
+  return new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error('no indexedDB'));
+    const r = indexedDB.open('kasboek', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function idbGet(key) { return new Promise((res, rej) => { const r = idbHandle.transaction('kv').objectStore('kv').get(key); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+function idbPut(key, val) { return new Promise((res, rej) => { const tx = idbHandle.transaction('kv', 'readwrite'); tx.objectStore('kv').put(val, key); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
+function idbDel(key) { return new Promise(res => { try { const tx = idbHandle.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(key); tx.oncomplete = () => res(); tx.onerror = () => res(); } catch (e) { res(); } }); }
+async function loadData() {
+  let raw = null;
+  try {
+    idbHandle = await idbOpen(); storageMode = 'idb'; raw = await idbGet('data');
+    fileHandle = (await idbGet('fh')) || null;
+    baseStr = (await idbGet('base')) || null;
+  } catch (e) { idbHandle = null; }
+  if (!raw) { try { raw = localStorage.getItem('kasboek-data'); if (storageMode === 'none' && localStorage) storageMode = 'ls'; } catch (e) {} }
+  if (raw) { try { const d = JSON.parse(raw); if (d && d.app === 'kasboek') return d; } catch (e) {} }
+  return null;
+}
+function scheduleSave() { saveState = 'saving'; updateSaveStatus(); clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 400); }
+async function saveNow() {
+  const json = JSON.stringify(DB);
+  try {
+    if (storageMode === 'idb') await idbPut('data', json);
+    else { localStorage.setItem('kasboek-data', json); storageMode = 'ls'; }
+    saveState = 'saved';
+  } catch (e) {
+    try { localStorage.setItem('kasboek-data', json); storageMode = 'ls'; saveState = 'saved'; }
+    catch (e2) { saveState = 'failed'; }
+  }
+  updateSaveStatus();
+  if (fileHandle && fileStatus === 'ok') syncFile();
+}
+
+/* ===================================================================
+   Shared data file — lets two computers (Mac, Windows) use the same data.
+   The file lives in a folder synced by iCloud Drive, OneDrive, Dropbox or
+   Google Drive. Each record carries a "last changed" time; when both
+   computers changed things, the changes are combined record by record.
+   =================================================================== */
+const fsSupported = typeof window.showOpenFilePicker === 'function' && typeof window.showSaveFilePicker === 'function';
+const FILE_TYPES = [{ description: 'Kasboek data', accept: { 'application/json': ['.json'] } }];
+const COLLS = ['accounts', 'categories', 'transactions'];
+let fileHandle = null, fileStatus = 'none', fileError = '', baseStr = null, baseMaps = null;
+let lastMod = 0, lastSync = 0, syncing = false, syncAgain = false;
+
+function plainJSON(e) { const o = Object.assign({}, e); delete o.mt; return JSON.stringify(o); }
+function getBaseMaps() {
+  if (baseMaps) return baseMaps;
+  let b = null; try { b = baseStr ? JSON.parse(baseStr) : null; } catch (e) {}
+  b = b || emptyDB();
+  baseMaps = { settings: plainJSON(b.settings || {}) };
+  for (const c of COLLS) { const m = new Map(); for (const e of b[c] || []) m.set(e.id, plainJSON(e)); baseMaps[c] = m; }
+  return baseMaps;
+}
+/* Mark everything that changed since the last sync with the current time,
+   and remember deletions, so the other computer's copy can be combined. */
+function stampChanges() {
+  const now = Date.now();
+  DB.deleted = DB.deleted || {};
+  if (!baseStr) return;
+  const bm = getBaseMaps();
+  for (const c of COLLS) {
+    const seen = new Set();
+    for (const e of DB[c]) { seen.add(e.id); const b = bm[c].get(e.id); if (b === undefined || b !== plainJSON(e)) e.mt = now; }
+    for (const id of bm[c].keys()) if (!seen.has(id)) DB.deleted[id] = now;
+  }
+  if (plainJSON(DB.settings) !== bm.settings) DB.settings.mt = now;
+}
+/* Combine two copies: per record the most recently changed version wins;
+   on a tie "ours" wins. Deleted records stay deleted unless changed later. */
+function mergeDB(ours, theirs) {
+  const out = Object.assign(emptyDB(), theirs);
+  const del = Object.assign({}, theirs.deleted || {});
+  for (const [k, v] of Object.entries(ours.deleted || {})) if (!(del[k] >= v)) del[k] = v;
+  const cutoff = Date.now() - 400 * 864e5;
+  for (const k of Object.keys(del)) if (del[k] < cutoff) delete del[k];
+  for (const c of COLLS) {
+    const m = new Map();
+    for (const e of theirs[c] || []) m.set(e.id, e);
+    for (const e of ours[c] || []) { const t = m.get(e.id); if (!t || (e.mt || 0) >= (t.mt || 0)) m.set(e.id, e); }
+    out[c] = Array.from(m.values()).filter(e => !(del[e.id] != null && del[e.id] >= (e.mt || 0)));
+  }
+  out.deleted = del;
+  out.settings = Object.assign(emptyDB().settings, ((ours.settings || {}).mt || 0) > ((theirs.settings || {}).mt || 0) ? ours.settings : theirs.settings);
+  out.seq = Math.max(ours.seq || 1, theirs.seq || 1);
+  out.lastBackup = [ours.lastBackup, theirs.lastBackup].filter(Boolean).sort().pop() || null;
+  return out;
+}
+/* After combining, make sure both sides of every transfer are present and consistent. */
+function repairLinks() {
+  _idx = null;
+  const accIds = new Set(DB.accounts.map(a => a.id));
+  DB.transactions = DB.transactions.filter(t => accIds.has(t.accountId));
+  const ids = new Set(DB.transactions.map(t => t.id));
+  DB.transactions = DB.transactions.filter(t => !t.linkId || ids.has(t.linkId));
+  const legs = new Map();
+  for (const t of DB.transactions) if (t.linkId) { if (!legs.has(t.linkId)) legs.set(t.linkId, []); legs.get(t.linkId).push(t); }
+  for (const t of DB.transactions.slice()) {
+    if (t.linkId) continue;
+    if (t.transferAccountId && !accIds.has(t.transferAccountId)) t.transferAccountId = null;
+    if (t.splits) for (const s of t.splits) if (s.transferAccountId && !accIds.has(s.transferAccountId)) s.transferAccountId = null;
+    const want = [];
+    if (t.splits && t.splits.length) t.splits.forEach((s, i) => { if (s.transferAccountId && s.transferAccountId !== t.accountId) want.push(i + ':' + s.transferAccountId + ':' + (-s.amount)); });
+    else if (t.transferAccountId && t.transferAccountId !== t.accountId) want.push('-1:' + t.transferAccountId + ':' + (-t.amount));
+    const have = (legs.get(t.id) || []).map(l => (l.linkKey == null ? -1 : l.linkKey) + ':' + l.accountId + ':' + l.amount + (l.date === t.date ? '' : '!'));
+    if (want.sort().join('|') !== have.sort().join('|')) syncLegs(t);
+  }
+  _idx = null;
+}
+async function syncFile() {
+  if (!fileHandle || fileStatus === 'needs-permission') return;
+  if (syncing) { syncAgain = true; return; }
+  syncing = true; updateSaveStatus();
+  try {
+    const f = await fileHandle.getFile();
+    const text = await f.text();
+    let theirs = null;
+    if (text.trim()) {
+      theirs = JSON.parse(text);
+      if (!theirs || theirs.app !== 'kasboek') throw new Error('This file is not a Kasboek data file.');
+    }
+    const external = theirs && text !== baseStr;
+    const beforeJSON = external ? JSON.stringify([DB.accounts, DB.categories, DB.transactions, DB.settings]) : null;
+    stampChanges();
+    if (theirs) { DB = mergeDB(DB, theirs); if (external) repairLinks(); }
+    const out = JSON.stringify(DB);
+    if (out !== text) { const w = await fileHandle.createWritable(); await w.write(out); await w.close(); }
+    baseStr = out; baseMaps = null;
+    lastMod = (await fileHandle.getFile()).lastModified;
+    lastSync = Date.now(); fileStatus = 'ok'; fileError = '';
+    if (idbHandle) { await idbPut('base', out); await idbPut('data', out); }
+    if (external) {
+      _idx = null; resetFormats(); applyTheme();
+      if (JSON.stringify([DB.accounts, DB.categories, DB.transactions, DB.settings]) !== beforeJSON) {
+        if (!modalStack.length && document.activeElement && document.activeElement.id !== 'reg-search') render();
+        else { renderSide(); }
+        toast('Changes made on the other computer have been added.');
+      }
+    }
+  } catch (e) {
+    if (e && e.name === 'NotAllowedError') fileStatus = 'needs-permission';
+    else { fileStatus = 'error'; fileError = (e && e.message) || String(e); }
+    if (state.view) render();
+  } finally {
+    syncing = false; updateSaveStatus();
+    if (syncAgain) { syncAgain = false; syncFile(); }
+  }
+}
+async function checkForOtherComputer() {
+  if (!fileHandle || fileStatus !== 'ok' || syncing) return;
+  try { const f = await fileHandle.getFile(); if (f.lastModified !== lastMod) syncFile(); }
+  catch (e) { fileStatus = 'error'; fileError = (e && e.message) || String(e); render(); }
+}
+async function useFileHandle(h) {
+  fileHandle = h;
+  if (idbHandle) await idbPut('fh', h);
+  fileStatus = 'ok';
+  await syncFile();
+  render();
+}
+async function createSharedFile() {
+  let h;
+  try { h = await window.showSaveFilePicker({ suggestedName: 'Kasboek data.json', types: FILE_TYPES }); } catch (e) { return; }
+  baseStr = null; baseMaps = null;
+  await useFileHandle(h);
+  if (fileStatus === 'ok') alertBox('Shared data file created', `<p>Kasboek now saves everything in <b>${esc(h.name)}</b>.</p><p>On the other computer, open Kasboek in Chrome or Edge, go to <b>Settings &amp; backup</b> and choose <b>Open existing shared file</b>.</p>`);
+}
+async function openSharedFile() {
+  let h;
+  try { [h] = await window.showOpenFilePicker({ types: FILE_TYPES, multiple: false }); } catch (e) { return; }
+  let theirs;
+  try { theirs = JSON.parse(await (await h.getFile()).text()); } catch (e) { theirs = null; }
+  if (!theirs || theirs.app !== 'kasboek') return alertBox('That is not a Kasboek data file', '<p>Choose the file that was created with “Create shared file” on the other computer (usually called <i>Kasboek data.json</i>).</p>');
+  if (DB.transactions.length && !baseStr) {
+    const combine = await confirmBox('Combine with the data on this computer?', `<p>This computer already has <b>${DB.transactions.length.toLocaleString()}</b> transactions, and the shared file has <b>${theirs.transactions.length.toLocaleString()}</b>.</p><p><b>Combine</b> keeps both. <b>Cancel</b>, then use “Erase all data” first, if you only want what is in the shared file.</p>`, 'Combine');
+    if (!combine) return;
+  }
+  baseStr = null; baseMaps = null;
+  await useFileHandle(h);
+}
+async function reconnectFile() {
+  try {
+    const p = await fileHandle.requestPermission({ mode: 'readwrite' });
+    if (p === 'granted') { fileStatus = 'ok'; await syncFile(); render(); }
+  } catch (e) { fileStatus = 'error'; fileError = e.message; render(); }
+}
+async function stopSharedFile() {
+  if (!await confirmBox('Stop using the shared file?', '<p>Kasboek will keep a copy of all data on this computer, but changes will no longer be shared with the other computer. The shared file itself is not deleted.</p>', 'Stop sharing')) return;
+  fileHandle = null; fileStatus = 'none'; baseStr = null; baseMaps = null;
+  if (idbHandle) { await idbDel('fh'); await idbDel('base'); }
+  render();
+}
+async function mergeOtherFile() {
+  let h;
+  try { [h] = await window.showOpenFilePicker({ types: FILE_TYPES, multiple: false }); } catch (e) { return; }
+  let other;
+  try { other = JSON.parse(await (await h.getFile()).text()); } catch (e) { other = null; }
+  if (!other || other.app !== 'kasboek') return alertBox('That is not a Kasboek file', '<p>Choose a Kasboek data or backup file.</p>');
+  stampChanges();
+  const n0 = DB.transactions.length;
+  DB = mergeDB(DB, other); repairLinks(); changed(); render();
+  alertBox('Files combined', `<p>${(DB.transactions.length - n0).toLocaleString()} transactions were added from <b>${esc(h.name)}</b>. Changes to existing transactions were combined, keeping the most recent version of each.</p>`);
+}
+function fileBanner() {
+  if (!fileHandle) return '';
+  if (fileStatus === 'needs-permission') return `<div class="banner"><span class="grow"><b>Open the shared data file to continue.</b> For your privacy the browser asks once each time Kasboek starts. File: ${esc(fileHandle.name)}</span><button class="btn small primary" data-act="fs-reconnect">Open shared file</button></div>`;
+  if (fileStatus === 'error') return `<div class="banner"><span class="grow"><b>The shared data file could not be reached.</b> ${esc(fileError)} Your changes are kept on this computer and will be added to the file once it is reachable again.</span><button class="btn small" data-act="fs-sync">Try again</button><button class="btn small" data-act="fs-open">Choose the file again…</button></div>`;
+  return '';
+}
+window.addEventListener('beforeunload', e => { if (saveState === 'saving') { saveNow(); } });
+function updateSaveStatus() {
+  const el = $('#savestatus'); if (!el) return;
+  if (fileHandle) {
+    const t = lastSync ? new Date(lastSync).toLocaleTimeString(DB.settings.locale, { hour: '2-digit', minute: '2-digit' }) : '';
+    el.textContent = fileStatus === 'ok' ? (syncing || saveState === 'saving' ? 'Saving to shared file…' : `Shared file “${fileHandle.name}” · up to date${t ? ' at ' + t : ''}`)
+      : fileStatus === 'needs-permission' ? 'Shared file not opened yet' : 'Shared file not reachable — changes kept on this computer';
+    el.style.color = fileStatus === 'ok' ? '' : 'var(--neg)';
+    return;
+  }
+  el.textContent = saveState === 'saved' ? 'All changes saved on this computer' : saveState === 'saving' ? 'Saving…' : 'Could not save — please use “Save backup file”';
+  el.style.color = saveState === 'failed' ? 'var(--neg)' : '';
+}
+function download(name, text, mime) {
+  const blob = new Blob([text], { type: mime });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function saveBackup() {
+  DB.lastBackup = new Date().toISOString();
+  download('Kasboek backup ' + todayISO() + '.json', JSON.stringify(DB, null, 1), 'application/json');
+  changed(); render();
+  toast('Backup file saved to your Downloads folder.');
+}
+function openBackup() { $('#file-backup').value = ''; $('#file-backup').click(); }
+$('#file-backup').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  let d;
+  try { d = JSON.parse(await f.text()); } catch (err) { return alertBox('That file could not be read', 'It does not look like a Kasboek backup file.'); }
+  if (!d || d.app !== 'kasboek' || !Array.isArray(d.transactions)) return alertBox('That file could not be read', 'It does not look like a Kasboek backup file.');
+  const ok = await confirmBox('Open this backup?', `<p>The backup contains <b>${d.accounts.length}</b> accounts and <b>${d.transactions.length.toLocaleString()}</b> transactions.</p><p>It will <b>replace</b> everything currently in Kasboek. If you are unsure, save a backup of the current data first.</p>`, 'Replace with backup', true);
+  if (!ok) return;
+  DB = Object.assign(emptyDB(), d); DB.settings = Object.assign(emptyDB().settings, d.settings || {});
+  resetFormats(); applyTheme(); changed(); state = { view: 'home' }; render();
+  toast('Backup opened.');
+});
+
+/* ---------- categories ---------- */
+function catName(id) {
+  const I = idx(), c = I.cat.get(id);
+  if (!c) return '';
+  if (c.parentId) { const p = I.cat.get(c.parentId); return (p ? p.name + ' : ' : '') + c.name; }
+  return c.name;
+}
+function topCat(id) { const c = idx().cat.get(id); if (!c) return null; return c.parentId ? idx().cat.get(c.parentId) || c : c; }
+function catKind(id) { if (id === '_in') return 'income'; if (id === '_out') return 'expense'; const t = topCat(id); return t ? t.kind : 'expense'; }
+function findCategoryByPath(path) {
+  const parts = String(path).split(':').map(s => s.trim()).filter(Boolean);
+  if (!parts.length) return null;
+  const top = DB.categories.find(c => !c.parentId && c.name.toLowerCase() === parts[0].toLowerCase());
+  if (!top) return null;
+  if (parts.length === 1) return top;
+  const subName = parts.slice(1).join(' : ').toLowerCase();
+  return DB.categories.find(c => c.parentId === top.id && c.name.toLowerCase() === subName) || null;
+}
+function findOrCreateCategory(path, kindHint) {
+  const parts = String(path).split(':').map(s => s.trim()).filter(Boolean);
+  if (!parts.length) return null;
+  let top = DB.categories.find(c => !c.parentId && c.name.toLowerCase() === parts[0].toLowerCase());
+  let created = 0;
+  if (!top) { top = { id: uid(), name: parts[0], parentId: null, kind: kindHint || 'expense' }; DB.categories.push(top); created++; _idx = null; }
+  if (parts.length === 1) return { cat: top, created };
+  const subName = parts.slice(1).join(' : ');
+  let sub = DB.categories.find(c => c.parentId === top.id && c.name.toLowerCase() === subName.toLowerCase());
+  if (!sub) { sub = { id: uid(), name: subName, parentId: top.id, kind: top.kind }; DB.categories.push(sub); created++; _idx = null; }
+  return { cat: sub, created };
+}
+function sortedTopCats(kind) { return DB.categories.filter(c => !c.parentId && (!kind || c.kind === kind)).sort((a, b) => a.name.localeCompare(b.name)); }
+
+/* options for a category <select>; values: "" | c:<id> | t:<accountId> | __new */
+function catOptions(selected, excludeAccountId, opts = {}) {
+  const I = idx();
+  let h = `<option value="">${opts.noneLabel || '— No category —'}</option>`;
+  for (const [kind, label] of [['expense', 'Expenses'], ['income', 'Income']]) {
+    const tops = sortedTopCats(kind);
+    if (!tops.length) continue;
+    h += `<optgroup label="${label}">`;
+    for (const t of tops) {
+      h += `<option value="c:${t.id}" ${selected === 'c:' + t.id ? 'selected' : ''}>${esc(t.name)}</option>`;
+      for (const s of (I.childrenOf.get(t.id) || [])) h += `<option value="c:${s.id}" ${selected === 'c:' + s.id ? 'selected' : ''}>    ${esc(t.name)} : ${esc(s.name)}</option>`;
+    }
+    h += `</optgroup>`;
+  }
+  if (!opts.noTransfers) {
+    const accs = DB.accounts.filter(a => a.id !== excludeAccountId && (!a.closed || selected === 't:' + a.id));
+    if (accs.length) {
+      h += `<optgroup label="Transfer to / from account">`;
+      for (const a of accs) h += `<option value="t:${a.id}" ${selected === 't:' + a.id ? 'selected' : ''}>↔ ${esc(a.name)}</option>`;
+      h += `</optgroup>`;
+    }
+  }
+  if (!opts.noNew) h += `<option value="__new">+ New category…</option>`;
+  return h;
+}
+
+/* ---------- transactions & transfers ---------- */
+function newTx(fields) { const t = Object.assign({ id: uid(), seq: DB.seq++, payee: '', memo: '', num: '', status: '', categoryId: null, transferAccountId: null, splits: null }, fields); DB.transactions.push(t); return t; }
+
+/* A transfer is stored once (the "source") in one account; the other side(s) are
+   automatically maintained "legs" in the other account(s). */
+function syncLegs(src) {
+  const want = [];
+  if (src.splits && src.splits.length) {
+    src.splits.forEach((s, i) => { if (s.transferAccountId && s.transferAccountId !== src.accountId) want.push({ k: i, acc: s.transferAccountId, amt: -s.amount, memo: s.memo || src.memo }); });
+  } else if (src.transferAccountId && src.transferAccountId !== src.accountId) {
+    want.push({ k: -1, acc: src.transferAccountId, amt: -src.amount, memo: src.memo });
+  }
+  const existing = DB.transactions.filter(t => t.linkId === src.id);
+  const keep = new Set();
+  for (const w of want) {
+    let leg = existing.find(l => l.linkKey === w.k && !keep.has(l.id)) || existing.find(l => l.accountId === w.acc && !keep.has(l.id));
+    if (!leg) leg = newTx({ linkId: src.id, status: '' });
+    keep.add(leg.id);
+    if (leg.accountId && leg.accountId !== w.acc) leg.status = '';
+    Object.assign(leg, { linkKey: w.k, accountId: w.acc, date: src.date, amount: w.amt, payee: src.payee, memo: w.memo || '', transferAccountId: src.accountId, categoryId: null, splits: null });
+  }
+  if (existing.some(l => !keep.has(l.id))) DB.transactions = DB.transactions.filter(t => !(t.linkId === src.id && !keep.has(t.id)));
+}
+function deleteTx(src) {
+  DB.transactions = DB.transactions.filter(t => t.id !== src.id && t.linkId !== src.id);
+}
+function txCategoryLabel(t) {
+  const I = idx();
+  if (t.ob) return '<span class="muted">Opening balance</span>';
+  if (t.linkId) { const s = I.tx.get(t.linkId); const a = s && I.acc.get(s.accountId); return '↔ ' + esc(a ? a.name : 'other account'); }
+  if (t.splits && t.splits.length) return `Split (${t.splits.length} lines)`;
+  if (t.transferAccountId) { const a = I.acc.get(t.transferAccountId); return '↔ ' + esc(a ? a.name : 'other account'); }
+  if (t.categoryId) return esc(catName(t.categoryId));
+  return '<span class="muted">Uncategorized</span>';
+}
+function txCategoryText(t) { const d = document.createElement('div'); d.innerHTML = txCategoryLabel(t); return d.textContent; }
+function accName(id) { const a = idx().acc.get(id); return a ? a.name : ''; }
+
+/* ---------- UI state & routing ---------- */
+let state = { view: 'home' };
+const regState = { search: '', period: 'all', shown: 300 };
+let recon = null;
+let lastEnteredDate = null;
+let reportState = { type: 'spending', period: 'thisYear', custom: {}, account: 'all', drill: null, drill2: null, catSel: '' };
+
+function go(view, extra) { state = Object.assign({ view }, extra || {}); if (view !== 'account') recon = null; regState.shown = 300; render(); $('#main').scrollTop = 0; }
+
+function render() {
+  renderSide();
+  const m = $('#main');
+  const v = state.view;
+  if (!DB.accounts.length && v === 'home') m.innerHTML = viewWelcome();
+  else if (v === 'home') m.innerHTML = viewHome();
+  else if (v === 'account') m.innerHTML = viewRegister();
+  else if (v === 'reports') m.innerHTML = viewReports();
+  else if (v === 'categories') m.innerHTML = viewCategories();
+  else if (v === 'settings') m.innerHTML = viewSettings();
+  else if (v === 'import') m.innerHTML = viewImport();
+  afterRender();
+  updateSaveStatus();
+}
+
+const ICONS = {
+  home: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>',
+  reports: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  cats: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/></svg>',
+  import: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>',
+  settings: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>',
+  acct: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>',
+};
+
+function renderSide() {
+  const I = idx();
+  const on = (v, id) => (state.view === v && (!id || state.accountId === id)) ? ' on' : '';
+  let h = `<div class="brand"><svg width="26" height="26" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M9 21V11M9 16l7-5M9 16l7 5M19 21h5M19 16h5M19 11h5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><span class="t">Kasboek</span></div>
+  <button class="nav${on('home')}" data-go="home">${ICONS.home}<span class="nm">Home</span></button>`;
+  for (const [label, types] of ACCOUNT_GROUPS) {
+    const accs = DB.accounts.filter(a => types.includes(a.type) && !a.closed).sort((a, b) => a.name.localeCompare(b.name));
+    if (!accs.length) continue;
+    h += `<h3>${label}</h3>`;
+    for (const a of accs) { const b = I.bal.get(a.id) || 0; h += `<button class="nav${on('account', a.id)}" data-acc="${a.id}">${ICONS.acct}<span class="nm">${esc(a.name)}</span><span class="amt ${b < 0 ? 'neg' : ''}">${esc(money(b))}</span></button>`; }
+  }
+  const closed = DB.accounts.filter(a => a.closed).sort((a, b) => a.name.localeCompare(b.name));
+  if (closed.length) {
+    h += `<h3>Closed accounts</h3>`;
+    for (const a of closed) h += `<button class="nav${on('account', a.id)}" data-acc="${a.id}">${ICONS.acct}<span class="nm muted">${esc(a.name)}</span></button>`;
+  }
+  h += `<button class="nav addacc" data-act="add-account" style="margin-top:6px">+ Add account</button>
+  <h3>Tools</h3>
+  <button class="nav${on('reports')}" data-go="reports">${ICONS.reports}<span class="nm">Reports</span></button>
+  <button class="nav${on('categories')}" data-go="categories">${ICONS.cats}<span class="nm">Categories</span></button>
+  <button class="nav${on('import')}" data-go="import">${ICONS.import}<span class="nm">Import from Money</span></button>
+  <button class="nav${on('settings')}" data-go="settings">${ICONS.settings}<span class="nm">Settings &amp; backup</span></button>
+  <div class="foot"><span id="savestatus" class="status-saved"></span></div>`;
+  $('#side').innerHTML = h;
+}
+
+/* ---------- Welcome & Home ---------- */
+function viewWelcome() {
+  return `<div class="page"><div class="welcome">
+    <h1>Welcome to Kasboek</h1>
+    <p class="sub">Your accounts, transactions and reports, kept privately on this computer.</p>
+    <div class="big">
+      ${installPrompt && !isInstalledApp() ? `<button class="bigbtn" data-act="install" style="border-color:var(--accent)"><b>Install Kasboek on this computer</b><span>Gives Kasboek its own icon in the Dock or Start menu and its own window.</span></button>` : ''}
+      ${fsSupported && !fileHandle ? `<button class="bigbtn" data-act="fs-open"><b>Open our shared data file</b><span>Kasboek is already set up on another computer? Choose the shared file (for example “Kasboek data.json”) to work in the same data.</span></button>` : ''}
+      <button class="bigbtn" data-go="import"><b>Bring in my Microsoft Money data</b><span>Import the QIF files exported from Money. Your accounts, categories and transfers are recreated.</span></button>
+      <button class="bigbtn" data-act="add-account"><b>Start with a new account</b><span>Enter an account name and its current balance, then add transactions.</span></button>
+      <button class="bigbtn" data-act="open-backup"><b>Open a Kasboek backup file</b><span>Continue where you left off on another computer.</span></button>
+      <button class="bigbtn" data-act="sample"><b>Look around with example data</b><span>Two years of made-up transactions. You can erase it later under Settings.</span></button>
+    </div>
+  </div></div>`;
+}
+
+function backupBanner() {
+  if (!DB.transactions.length) return '';
+  const last = DB.lastBackup ? new Date(DB.lastBackup) : null;
+  const days = last ? Math.floor((Date.now() - last) / 864e5) : null;
+  if (last && days < 14) return '';
+  return `<div class="banner"><span class="grow"><b>${last ? `Your last backup file is ${days} days old.` : 'You have not saved a backup file yet.'}</b> Kasboek keeps your data in this browser; a backup file protects it if the browser is reset or the computer is replaced.</span><button class="btn small" data-act="save-backup">Save backup file</button></div>`;
+}
+
+function categoryFlows(from, to, accountId) {
+  const flows = new Map();
+  const add = (k, v) => flows.set(k, (flows.get(k) || 0) + v);
+  for (const t of DB.transactions) {
+    if (t.linkId || t.ob || t.date < from || t.date > to) continue;
+    if (accountId && accountId !== 'all' && t.accountId !== accountId) continue;
+    if (t.splits && t.splits.length) {
+      for (const s of t.splits) { if (s.transferAccountId) continue; add(s.categoryId || (s.amount > 0 ? '_in' : '_out'), s.amount); }
+    } else if (!t.transferAccountId) add(t.categoryId || (t.amount > 0 ? '_in' : '_out'), t.amount);
+  }
+  return flows;
+}
+function sumByKind(flows) {
+  let income = 0, expense = 0;
+  for (const [k, v] of flows) { if (catKind(k) === 'income') income += v; else expense -= v; }
+  return { income, expense };
+}
+
+function viewHome() {
+  const I = idx();
+  let net = 0; for (const a of DB.accounts) net += I.bal.get(a.id) || 0;
+  const [from, to] = periodRange('thisMonth');
+  const flows = categoryFlows(from, to, 'all');
+  const { income, expense } = sumByKind(flows);
+  const spend = spendingRows(flows, null).slice(0, 6);
+  let accHTML = '';
+  for (const [label, types] of ACCOUNT_GROUPS) {
+    const accs = DB.accounts.filter(a => types.includes(a.type) && !a.closed).sort((a, b) => a.name.localeCompare(b.name));
+    if (!accs.length) continue;
+    const tot = accs.reduce((s, a) => s + (I.bal.get(a.id) || 0), 0);
+    accHTML += `<tr><td colspan="2" style="padding-top:14px" class="muted"><b>${label}</b></td></tr>`;
+    for (const a of accs) accHTML += `<tr class="click" data-acc="${a.id}"><td>${esc(a.name)}</td><td class="num">${moneyHTML(I.bal.get(a.id) || 0)}</td></tr>`;
+    if (accs.length > 1) accHTML += `<tr><td class="muted">Total ${label.toLowerCase()}</td><td class="num muted">${esc(money(tot))}</td></tr>`;
+  }
+  const recent = DB.transactions.filter(t => !t.linkId).sort(cmpTx).slice(-8).reverse();
+  return `<div class="page">
+    ${backupBanner()}
+    <div class="head"><div class="grow"><div class="sub">Net worth</div><div class="hero ${net < 0 ? 'neg' : ''}">${esc(money(net))}</div></div>
+      <button class="btn primary" data-act="new-tx-any">+ New transaction</button></div>
+    <div class="cols2">
+      <div class="card"><h2>Accounts</h2><table class="t">${accHTML}</table></div>
+      <div class="card"><h2>This month</h2>
+        <div class="tiles">
+          <div class="tile"><div class="k">Income</div><div class="v">${esc(money(income))}</div></div>
+          <div class="tile"><div class="k">Spending</div><div class="v">${esc(money(expense))}</div></div>
+          <div class="tile"><div class="k">Difference</div><div class="v ${income - expense < 0 ? 'neg' : ''}">${esc(money(income - expense))}</div></div>
+        </div>
+        <h2 style="margin-top:18px">Where the money went</h2>
+        ${spend.length ? hbarsHTML(spend, false) : '<p class="muted">No spending recorded this month yet.</p>'}
+        <div style="margin-top:10px"><button class="btn link" data-go="reports">Open reports →</button></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px"><h2>Latest transactions</h2>
+      ${recent.length ? `<table class="t"><thead><tr><th>Date</th><th>Account</th><th>Payee</th><th>Category</th><th class="num">Amount</th></tr></thead><tbody>
+      ${recent.map(t => `<tr class="click" data-acc="${t.accountId}"><td>${fmtDate(t.date)}</td><td>${esc(accName(t.accountId))}</td><td>${esc(t.payee)}</td><td class="cat">${txCategoryLabel(t)}</td><td class="num">${moneyHTML(t.amount)}</td></tr>`).join('')}
+      </tbody></table>` : '<p class="muted">No transactions yet.</p>'}
+    </div>
+  </div>`;
+}
+
+/* ---------- Account register ---------- */
+function viewRegister() {
+  const I = idx();
+  const a = I.acc.get(state.accountId);
+  if (!a) { state = { view: 'home' }; return viewHome(); }
+  const all = I.byAcc.get(a.id) || [];
+  let run = 0; const runBal = new Map();
+  for (const t of all) { run += t.amount; runBal.set(t.id, run); }
+  const bal = run;
+  const clearedBal = all.reduce((s, t) => s + (t.status ? t.amount : 0), 0);
+  const debt = isDebtType(a.type);
+  let rows;
+  let reconHTML = '';
+  if (recon && recon.accountId === a.id) {
+    rows = all.filter(t => t.status !== 'R' && t.date <= recon.date).slice().reverse();
+    const opening = all.filter(t => t.status === 'R').reduce((s, t) => s + t.amount, 0);
+    const cleared = opening + all.filter(t => recon.checked.has(t.id)).reduce((s, t) => s + t.amount, 0);
+    const diff = recon.ending - cleared;
+    reconHTML = `<div class="recon">
+      <div><div class="k">Statement date</div><div class="v">${fmtDate(recon.date)}</div></div>
+      <div><div class="k">Statement balance</div><div class="v">${esc(money(recon.ending))}</div></div>
+      <div><div class="k">Ticked off so far</div><div class="v">${esc(money(cleared))}</div></div>
+      <div><div class="k">Difference</div><div class="v ${diff ? 'neg' : ''}">${esc(money(diff))}</div></div>
+      <span class="spacer"></span>
+      ${diff === 0 ? '<button class="btn primary" data-act="recon-finish">Finish — it balances</button>' : '<button class="btn" data-act="recon-adjust">Finish with adjustment…</button>'}
+      <button class="btn" data-act="recon-postpone">Postpone</button>
+      <button class="btn" data-act="recon-cancel">Cancel</button>
+      <div style="flex-basis:100%;font-size:13px;color:var(--ink-2)">Tick every transaction that appears on your statement. When the difference is ${esc(money(0))}, click Finish.</div>
+    </div>`;
+  } else {
+    const [from, to] = periodRange(regState.period, regState.custom);
+    const q = regState.search.trim().toLowerCase();
+    rows = all.filter(t => t.date >= from && t.date <= to);
+    if (q) rows = rows.filter(t => (t.payee + ' ' + t.memo + ' ' + t.num + ' ' + txCategoryText(t) + ' ' + moneyPlain(Math.abs(t.amount)) + ' ' + money(t.amount)).toLowerCase().includes(q));
+    rows = rows.slice().reverse();
+  }
+  const shown = rows.slice(0, regState.shown);
+  const inRecon = !!reconHTML;
+  const body = shown.map(t => {
+    const st = t.status || '';
+    const stCell = inRecon
+      ? `<input type="checkbox" data-recon="${t.id}" ${recon.checked.has(t.id) ? 'checked' : ''} aria-label="Ticked">`
+      : `<button class="stbtn ${st}" data-status="${t.id}" title="${st === 'R' ? 'Reconciled' : st === 'c' ? 'Cleared — click to unmark' : 'Not cleared — click to mark as cleared'}">${st === 'R' ? 'R' : st === 'c' ? 'c' : '·'}</button>`;
+    return `<tr class="click" data-tx="${t.id}">
+      <td class="st">${stCell}</td>
+      <td style="white-space:nowrap">${fmtDate(t.date)}</td>
+      <td class="numcol muted">${esc(t.num)}</td>
+      <td>${esc(t.payee) || '<span class="muted">—</span>'}${t.memo ? `<div class="hint">${esc(t.memo)}</div>` : ''}</td>
+      <td class="cat">${txCategoryLabel(t)}</td>
+      <td class="num">${t.amount < 0 ? esc(money(-t.amount)) : ''}</td>
+      <td class="num">${t.amount > 0 ? esc(money(t.amount)) : ''}</td>
+      ${inRecon ? '' : `<td class="num">${moneyHTML(runBal.get(t.id))}</td>`}
+    </tr>`;
+  }).join('');
+  const typeLabel = (ACCOUNT_TYPES.find(x => x[0] === a.type) || ['', ''])[1];
+  return `<div class="page">
+    <div class="head">
+      <div class="grow"><h1>${esc(a.name)}${a.closed ? ' <span class="pill">closed</span>' : ''}</h1>
+        <p class="sub">${esc(typeLabel)} · Balance <b class="${bal < 0 ? 'neg' : ''}">${esc(money(bal))}</b> · Cleared ${esc(money(clearedBal))}${debt && bal < 0 ? ` · You owe ${esc(money(-bal))}` : ''}</p></div>
+      <button class="btn" data-act="edit-account">Account details</button>
+      ${inRecon ? '' : '<button class="btn" data-act="recon-start">Reconcile…</button>'}
+      <button class="btn primary" data-act="new-tx">+ New transaction</button>
+    </div>
+    ${reconHTML}
+    ${inRecon ? '' : `<div class="toolbar">
+      <input type="search" id="reg-search" placeholder="Search payee, memo, category, amount…" value="${esc(regState.search)}">
+      <select id="reg-period">${PERIODS.map(([k, l]) => `<option value="${k}" ${regState.period === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      ${regState.period === 'custom' ? `<input type="date" id="reg-from" value="${esc((regState.custom || {}).from || '')}"> to <input type="date" id="reg-to" value="${esc((regState.custom || {}).to || '')}">` : ''}
+      <span class="grow"></span>
+      <span class="muted" style="font-size:13px">${rows.length.toLocaleString()} transaction${rows.length === 1 ? '' : 's'}</span>
+      <button class="btn small" data-act="reg-csv">Export to spreadsheet</button>
+    </div>`}
+    <div class="card" style="padding:4px 6px">
+    ${rows.length ? `<table class="t reg"><thead><tr><th class="st" title="Status">${inRecon ? '✓' : 'C'}</th><th>Date</th><th class="numcol">Num</th><th>Payee / memo</th><th>Category</th><th class="num">Payment</th><th class="num">Deposit</th>${inRecon ? '' : '<th class="num">Balance</th>'}</tr></thead><tbody>${body}</tbody></table>
+      ${rows.length > shown.length ? `<div class="more"><button class="btn" data-act="show-more">Show older transactions (${(rows.length - shown.length).toLocaleString()} more)</button></div>` : ''}`
+    : `<p class="muted" style="padding:18px">${all.length ? 'No transactions match.' : 'No transactions yet. Click “New transaction” to add one.'}</p>`}
+    </div>
+  </div>`;
+}
+
+function exportRegisterCSV() {
+  const I = idx(), a = I.acc.get(state.accountId); if (!a) return;
+  const all = I.byAcc.get(a.id) || [];
+  let run = 0;
+  const rows = [['Date', 'Number', 'Payee', 'Category', 'Memo', 'Status', 'Amount', 'Balance']];
+  const [from, to] = periodRange(regState.period, regState.custom);
+  for (const t of all) {
+    run += t.amount;
+    if (t.date < from || t.date > to) continue;
+    rows.push([fmtDate(t.date), t.num, t.payee, txCategoryText(t), t.memo, t.status, moneyPlain(t.amount), moneyPlain(run)]);
+  }
+  downloadCSV(a.name + ' ' + todayISO() + '.csv', rows);
+}
+function downloadCSV(name, rows) {
+  const sep = localeDecimal() === ',' ? ';' : ',';
+  const q = v => { v = String(v == null ? '' : v); return /[";,\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  download(name, '﻿' + rows.map(r => r.map(q).join(sep)).join('\r\n'), 'text/csv');
+}
+
+/* ---------- Modals ---------- */
+let modalStack = [];
+function openModal({ title, body, wide }) {
+  const w = document.createElement('div');
+  w.className = 'modal-wrap';
+  w.innerHTML = `<div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true"><div class="modal-head"><h2>${title}</h2><button class="icon-btn" data-close aria-label="Close">×</button></div><div class="modal-body">${body}</div></div>`;
+  document.body.appendChild(w);
+  w.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeModal(w); });
+  modalStack.push(w);
+  setTimeout(() => { const f = w.querySelector('[autofocus]') || w.querySelector('input:not([type=hidden]):not([type=checkbox]),select,textarea'); if (f) f.focus(); }, 30);
+  return w;
+}
+function closeModal(w) { w.remove(); modalStack = modalStack.filter(x => x !== w); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalStack.length) closeModal(modalStack[modalStack.length - 1]); });
+function confirmBox(title, html, okLabel, danger) {
+  return new Promise(res => {
+    const w = openModal({ title: esc(title), body: `<div>${html}</div><div class="modal-actions"><span class="spacer"></span><button class="btn" data-no>Cancel</button><button class="btn ${danger ? 'danger' : 'primary'}" data-yes>${esc(okLabel || 'OK')}</button></div>` });
+    $('[data-yes]', w).onclick = () => { closeModal(w); res(true); };
+    $('[data-no]', w).onclick = () => { closeModal(w); res(false); };
+    $('.icon-btn', w).addEventListener('click', () => res(false));
+    setTimeout(() => $('[data-yes]', w).focus(), 40);
+  });
+}
+function alertBox(title, html) {
+  const w = openModal({ title: esc(title), body: `<div>${html}</div><div class="modal-actions"><span class="spacer"></span><button class="btn primary" data-close>OK</button></div>` });
+  setTimeout(() => $('.btn.primary', w).focus(), 40);
+}
+function promptBox(title, label, value, hint) {
+  return new Promise(res => {
+    const w = openModal({ title: esc(title), body: `<form><label>${esc(label)}${hint ? ` <span class="hint">${esc(hint)}</span>` : ''}<input name="v" value="${esc(value || '')}" autofocus></label><div class="modal-actions"><span class="spacer"></span><button type="button" class="btn" data-no>Cancel</button><button class="btn primary">OK</button></div></form>` });
+    const f = $('form', w);
+    f.onsubmit = e => { e.preventDefault(); const v = f.v.value.trim(); closeModal(w); res(v || null); };
+    $('[data-no]', w).onclick = () => { closeModal(w); res(null); };
+    $('.icon-btn', w).addEventListener('click', () => res(null));
+  });
+}
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 3200);
+}
+
+/* ---------- Transaction editor ---------- */
+function openTxEditor(tx, accountId) {
+  const I = idx();
+  const fromLeg = tx && tx.linkId;
+  const src = tx ? (tx.linkId ? I.tx.get(tx.linkId) : tx) : null;
+  const isNew = !src;
+  const acctId = src ? src.accountId : accountId;
+  const acc = I.acc.get(acctId);
+  if (!acc) return;
+  const d = src ? JSON.parse(JSON.stringify(src)) : { date: lastEnteredDate || todayISO(), amount: null, payee: '', memo: '', num: '', status: '', categoryId: null, transferAccountId: null, splits: null };
+  let type = (d.amount != null && d.amount > 0) ? 'dep' : 'pay';
+  let curSel = d.transferAccountId ? 't:' + d.transferAccountId : d.categoryId ? 'c:' + d.categoryId : '';
+  const sgn = () => type === 'pay' ? -1 : 1;
+  let splits = (d.splits && d.splits.length) ? d.splits.map(s => ({ sel: s.transferAccountId ? 't:' + s.transferAccountId : s.categoryId ? 'c:' + s.categoryId : '', memo: s.memo || '', amt: moneyPlain(s.amount * sgn()) })) : null;
+
+  // refresh payee list
+  $('#payee-list').innerHTML = Array.from(I.payeeLast.values()).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3000).map(t => `<option value="${esc(t.payee)}">`).join('');
+
+  const body = `
+    ${fromLeg ? `<div class="note">This is the other side of a transfer entered in <b>${esc(acc.name)}</b>. It is shown here as it appears in ${esc(acc.name)}; changes apply to both accounts.</div>` : ''}
+    ${d.ob ? `<div class="note">This is the opening balance of the account.</div>` : ''}
+    <form id="txf" autocomplete="off">
+      <div class="seg"><button type="button" data-type="pay">Payment (money out)</button><button type="button" data-type="dep">Deposit (money in)</button></div>
+      <div class="grid2">
+        <label>Date<input type="date" name="date" value="${esc(d.date)}" required></label>
+        <label>Number <span class="hint">optional (cheque, reference)</span><input name="num" value="${esc(d.num)}"></label>
+      </div>
+      <label>Payee<input name="payee" list="payee-list" value="${esc(d.payee)}" ${isNew ? 'autofocus' : ''} placeholder="Who did you pay, or who paid you?"></label>
+      <label>Amount<input name="amount" inputmode="decimal" value="${d.amount != null ? esc(moneyPlain(Math.abs(d.amount))) : ''}" placeholder="0${localeDecimal()}00"></label>
+      <div id="cat-area"></div>
+      <label>Memo <span class="hint">optional</span><input name="memo" value="${esc(d.memo)}"></label>
+      <label>Status<select name="status">
+        <option value="" ${!d.status ? 'selected' : ''}>Not cleared</option>
+        <option value="c" ${d.status === 'c' ? 'selected' : ''}>Cleared (appears at the bank)</option>
+        <option value="R" ${d.status === 'R' ? 'selected' : ''}>Reconciled</option></select></label>
+      <div class="err" id="txerr"></div>
+      <div class="modal-actions">
+        ${!isNew ? '<button type="button" class="btn danger" data-del>Delete</button>' : ''}
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        ${isNew ? '<button type="button" class="btn" data-savenew>Save and add another</button>' : ''}
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>`;
+  const w = openModal({ title: (isNew ? 'New transaction' : 'Edit transaction') + ' — ' + esc(acc.name), body, wide: true });
+  const f = $('#txf', w);
+  const err = $('#txerr', w);
+
+  function updateSeg() { $$('.seg button', w).forEach(b => b.classList.toggle('on', b.dataset.type === type)); }
+  updateSeg();
+  $$('.seg button', w).forEach(b => b.onclick = () => { type = b.dataset.type; updateSeg(); updateSplitSum(); });
+
+  async function handleNewCat(sel, onDone) {
+    const name = await promptBox('New category', 'Category name', '', 'Use “Food : Groceries” to make a subcategory');
+    if (name) {
+      const r = findOrCreateCategory(name, type === 'pay' ? 'expense' : 'income');
+      changed(); onDone('c:' + r.cat.id);
+    } else onDone(null);
+  }
+
+  function renderCatArea() {
+    const el = $('#cat-area', w);
+    if (!splits) {
+      el.innerHTML = `<label>Category <span class="hint">or a transfer to another account</span><div class="row"><select name="cat">${catOptions(curSel, acctId)}</select><button type="button" class="btn small" data-split title="Divide this transaction over several categories">Split…</button></div></label>`;
+      const sel = $('select[name=cat]', el);
+      sel.onchange = () => {
+        if (sel.value === '__new') handleNewCat(sel, v => { if (v) curSel = v; renderCatArea(); });
+        else curSel = sel.value;
+      };
+      $('[data-split]', el).onclick = () => {
+        const a = parseUserAmount(f.amount.value);
+        splits = [{ sel: curSel, memo: '', amt: a != null ? moneyPlain(Math.abs(a)) : '' }, { sel: '', memo: '', amt: '' }];
+        renderCatArea();
+      };
+    } else {
+      el.innerHTML = `<div style="font-size:14px;font-weight:550;margin-bottom:4px">Split into categories</div>
+        <table class="splits"><tbody>${splits.map((s, i) => `<tr>
+          <td style="width:45%"><select data-si="${i}" data-f="sel">${catOptions(s.sel, acctId)}</select></td>
+          <td><input data-si="${i}" data-f="memo" value="${esc(s.memo)}" placeholder="Memo"></td>
+          <td class="amt"><input data-si="${i}" data-f="amt" value="${esc(s.amt)}" inputmode="decimal" placeholder="0${localeDecimal()}00"></td>
+          <td><button type="button" class="icon-btn" data-rm="${i}" aria-label="Remove line">×</button></td></tr>`).join('')}</tbody></table>
+        <div class="splitsum"><button type="button" class="btn small" data-addline>+ Add line</button><button type="button" class="btn small" data-fill>Put the remainder on the last line</button><button type="button" class="btn small" data-unsplit>Cancel split</button><span id="splitsum"></span></div>`;
+      $$('[data-si]', el).forEach(inp => {
+        const ev = inp.tagName === 'SELECT' ? 'change' : 'input';
+        inp.addEventListener(ev, () => {
+          const i = +inp.dataset.si, fld = inp.dataset.f;
+          if (fld === 'sel' && inp.value === '__new') { handleNewCat(inp, v => { if (v) splits[i].sel = v; renderCatArea(); }); return; }
+          splits[i][fld] = inp.value; updateSplitSum();
+        });
+      });
+      $$('[data-rm]', el).forEach(b => b.onclick = () => { splits.splice(+b.dataset.rm, 1); if (!splits.length) splits = null; renderCatArea(); });
+      $('[data-addline]', el).onclick = () => { splits.push({ sel: '', memo: '', amt: '' }); renderCatArea(); };
+      $('[data-unsplit]', el).onclick = () => { curSel = splits[0] ? splits[0].sel : ''; splits = null; renderCatArea(); };
+      $('[data-fill]', el).onclick = () => {
+        const total = parseUserAmount(f.amount.value);
+        if (total == null) return;
+        const others = splits.slice(0, -1).reduce((s, x) => s + (parseUserAmount(x.amt) || 0), 0);
+        splits[splits.length - 1].amt = moneyPlain(Math.abs(total) - others); renderCatArea();
+      };
+      updateSplitSum();
+    }
+  }
+  function updateSplitSum() {
+    const el = $('#splitsum', w); if (!el || !splits) return;
+    const sum = splits.reduce((s, x) => s + (parseUserAmount(x.amt) || 0), 0);
+    const total = parseUserAmount(f.amount.value);
+    if (total == null) { el.innerHTML = `Lines total ${esc(money(sum))}`; return; }
+    const left = Math.abs(total) - sum;
+    el.innerHTML = left === 0 ? `<span style="color:var(--pos)">✓ Lines add up to the amount</span>` : `Still to assign: <b class="${left < 0 ? 'neg' : ''}">${esc(money(left))}</b>`;
+  }
+  f.amount.addEventListener('input', updateSplitSum);
+  renderCatArea();
+
+  // auto-fill from the last transaction with this payee (like Money did)
+  if (isNew) f.payee.addEventListener('change', () => {
+    const last = idx().payeeLast.get(f.payee.value.trim().toLowerCase());
+    if (!last || f.amount.value) return;
+    type = last.amount > 0 ? 'dep' : 'pay'; updateSeg();
+    f.amount.value = moneyPlain(Math.abs(last.amount));
+    if (last.splits && last.splits.length) {
+      const s = last.amount > 0 ? 1 : -1;
+      splits = last.splits.map(x => ({ sel: x.transferAccountId ? 't:' + x.transferAccountId : x.categoryId ? 'c:' + x.categoryId : '', memo: x.memo || '', amt: moneyPlain(x.amount * s) }));
+    } else { splits = null; curSel = last.transferAccountId ? (last.transferAccountId === acctId ? '' : 't:' + last.transferAccountId) : last.categoryId ? 'c:' + last.categoryId : ''; }
+    renderCatArea();
+    f.amount.select();
+  });
+
+  function save() {
+    err.textContent = '';
+    const date = f.date.value;
+    if (!date) { err.textContent = 'Please enter a date.'; return false; }
+    let amt = parseUserAmount(f.amount.value);
+    let outSplits = null;
+    if (splits) {
+      const lines = splits.map(s => ({ sel: s.sel, memo: s.memo.trim(), v: parseUserAmount(s.amt) })).filter(s => s.v);
+      if (!lines.length) { err.textContent = 'Enter an amount on at least one split line.'; return false; }
+      const sum = lines.reduce((s, x) => s + x.v, 0);
+      if (amt == null) { amt = sum; f.amount.value = moneyPlain(sum); }
+      if (sum !== Math.abs(amt)) { err.textContent = `The split lines add up to ${money(sum)}, but the amount is ${money(Math.abs(amt))}. Adjust a line or use “Put the remainder on the last line”.`; return false; }
+      if (lines.length === 1) { curSel = lines[0].sel; }
+      else outSplits = lines.map(l => ({ categoryId: l.sel.startsWith('c:') ? l.sel.slice(2) : null, transferAccountId: l.sel.startsWith('t:') ? l.sel.slice(2) : null, memo: l.memo, amount: l.v * sgn() }));
+    }
+    if (amt == null) { err.textContent = 'Please enter an amount.'; f.amount.focus(); return false; }
+    if (amt === 0 && !d.ob) { err.textContent = 'The amount cannot be zero.'; return false; }
+    const fields = {
+      accountId: acctId, date, amount: Math.abs(amt) * sgn(), payee: f.payee.value.trim(), memo: f.memo.value.trim(), num: f.num.value.trim(), status: f.status.value,
+      splits: outSplits, categoryId: !outSplits && curSel.startsWith('c:') ? curSel.slice(2) : null, transferAccountId: !outSplits && curSel.startsWith('t:') ? curSel.slice(2) : null,
+    };
+    let t;
+    if (isNew) t = newTx(fields); else { t = DB.transactions.find(x => x.id === src.id); Object.assign(t, fields); }
+    syncLegs(t);
+    lastEnteredDate = date;
+    changed();
+    return true;
+  }
+  f.onsubmit = e => { e.preventDefault(); if (save()) { closeModal(w); render(); } };
+  const sn = $('[data-savenew]', w);
+  if (sn) sn.onclick = () => { if (save()) { closeModal(w); render(); openTxEditor(null, acctId); } };
+  const del = $('[data-del]', w);
+  if (del) del.onclick = async () => {
+    const hasLegs = (idx().legsOf.get(src.id) || []).length;
+    if (!await confirmBox('Delete this transaction?', hasLegs ? '<p>This is a transfer; it will be removed from both accounts.</p>' : '<p>This cannot be undone.</p>', 'Delete', true)) return;
+    deleteTx(src); changed(); closeModal(w); render();
+  };
+}
+
+/* ---------- Account editor ---------- */
+function openAccountEditor(acc) {
+  const isNew = !acc;
+  const a = acc || { name: '', type: 'checking', note: '', closed: false };
+  const n = acc ? (idx().byAcc.get(acc.id) || []).length : 0;
+  const w = openModal({
+    title: isNew ? 'Add an account' : 'Account details', body: `<form autocomplete="off">
+    <label>Account name<input name="name" value="${esc(a.name)}" required autofocus placeholder="e.g. ING current account"></label>
+    <label>Kind of account<select name="type">${ACCOUNT_TYPES.map(([k, l]) => `<option value="${k}" ${a.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    ${isNew ? `<div class="grid2"><label>Balance today <span class="hint" id="obhint">what the account holds now</span><input name="ob" inputmode="decimal" placeholder="0${localeDecimal()}00"></label>
+      <label>On date<input type="date" name="obdate" value="${todayISO()}"></label></div>` : ''}
+    <label>Note <span class="hint">optional (account number, bank, …)</span><input name="note" value="${esc(a.note || '')}"></label>
+    ${!isNew ? `<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="closed" ${a.closed ? 'checked' : ''} style="width:auto;min-height:0"> This account is closed (hide it from the list)</label>` : ''}
+    <div class="err"></div>
+    <div class="modal-actions">${!isNew ? '<button type="button" class="btn danger" data-del>Delete account</button>' : ''}<span class="spacer"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">${isNew ? 'Add account' : 'Save'}</button></div>
+  </form>`
+  });
+  const f = $('form', w);
+  const upHint = () => { const h = $('#obhint', w); if (h) h.textContent = isDebtType(f.type.value) ? 'the amount you owe now' : 'what the account holds now'; };
+  f.type.onchange = upHint; upHint();
+  f.onsubmit = e => {
+    e.preventDefault();
+    const name = f.name.value.trim();
+    if (!name) { $('.err', w).textContent = 'Please enter a name.'; return; }
+    if (DB.accounts.some(x => x !== acc && x.name.toLowerCase() === name.toLowerCase())) { $('.err', w).textContent = 'There is already an account with this name.'; return; }
+    if (isNew) {
+      const na = { id: uid(), name, type: f.type.value, note: f.note.value.trim(), closed: false };
+      DB.accounts.push(na);
+      let ob = parseUserAmount(f.ob.value) || 0;
+      if (isDebtType(na.type)) ob = -Math.abs(ob);
+      if (ob) newTx({ accountId: na.id, date: f.obdate.value || todayISO(), amount: ob, payee: 'Opening balance', ob: true, status: 'R' });
+      changed(); closeModal(w); go('account', { accountId: na.id });
+    } else {
+      Object.assign(acc, { name, type: f.type.value, note: f.note.value.trim(), closed: f.closed.checked });
+      changed(); closeModal(w); render();
+    }
+  };
+  const del = $('[data-del]', w);
+  if (del) del.onclick = async () => {
+    if (!await confirmBox('Delete “' + acc.name + '”?', `<p>This deletes the account${n ? ` and its <b>${n.toLocaleString()}</b> transactions` : ''}. Transfers from other accounts to this one will stay in those accounts, but become uncategorized.</p><p>If the account is simply no longer in use, you can mark it as <b>closed</b> instead.</p>`, 'Delete account', true)) return;
+    const gone = new Set(DB.transactions.filter(t => t.accountId === acc.id).map(t => t.id));
+    DB.transactions = DB.transactions.filter(t => !gone.has(t.id) && !(t.linkId && gone.has(t.linkId)));
+    for (const t of DB.transactions) {
+      if (t.transferAccountId === acc.id && !t.linkId) t.transferAccountId = null;
+      if (t.splits) for (const s of t.splits) if (s.transferAccountId === acc.id) s.transferAccountId = null;
+    }
+    DB.accounts = DB.accounts.filter(x => x !== acc);
+    changed(); closeModal(w); go('home');
+  };
+}
+
+/* ---------- Reconcile ---------- */
+function startReconcile() {
+  const a = idx().acc.get(state.accountId); if (!a) return;
+  const debt = isDebtType(a.type);
+  const prev = a.lastStatement;
+  const w = openModal({
+    title: 'Reconcile ' + esc(a.name), body: `<form>
+    <p class="sub" style="margin-top:0">Compare Kasboek with a statement from your bank. ${prev ? `Last time you reconciled up to ${fmtDate(prev.date)} with a balance of ${esc(money(prev.balance))}.` : ''}</p>
+    <div class="grid2"><label>Statement date<input type="date" name="date" value="${todayISO()}" required></label>
+    <label>${debt ? 'Amount owed on the statement' : 'Ending balance on the statement'}<input name="bal" inputmode="decimal" autofocus placeholder="0${localeDecimal()}00"></label></div>
+    <div class="err"></div>
+    <div class="modal-actions"><span class="spacer"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Start</button></div></form>`
+  });
+  const f = $('form', w);
+  f.onsubmit = e => {
+    e.preventDefault();
+    let v = parseUserAmount(f.bal.value);
+    if (v == null) { $('.err', w).textContent = 'Please enter the balance shown on the statement.'; return; }
+    if (debt) v = -Math.abs(v);
+    const all = idx().byAcc.get(a.id) || [];
+    recon = { accountId: a.id, date: f.date.value, ending: v, checked: new Set(all.filter(t => t.status === 'c' && t.date <= f.date.value).map(t => t.id)) };
+    closeModal(w); render();
+  };
+}
+function finishReconcile(mode) {
+  const a = idx().acc.get(recon.accountId);
+  const all = idx().byAcc.get(a.id) || [];
+  for (const t of all) {
+    if (t.status === 'R' || t.date > recon.date) continue;
+    if (recon.checked.has(t.id)) t.status = mode === 'postpone' ? 'c' : 'R';
+    else if (t.status === 'c' && mode !== 'postpone') t.status = '';
+  }
+  if (mode !== 'postpone') a.lastStatement = { date: recon.date, balance: recon.ending };
+  recon = null; changed(); render();
+  toast(mode === 'postpone' ? 'Your ticks are kept; continue later.' : 'Reconciled. Well done!');
+}
+
+/* ---------- Charts ---------- */
+function niceTicks(min, max, count) {
+  if (min === max) { max = min + 100; }
+  const span = max - min, step0 = span / (count || 4);
+  const mag = Math.pow(10, Math.floor(Math.log10(step0))), norm = step0 / mag;
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+  const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
+  const ticks = []; for (let v = lo; v <= hi + step / 2; v += step) ticks.push(Math.round(v));
+  return { lo, hi, ticks };
+}
+function hbarsHTML(rows, drillable) {
+  const max = Math.max(1, ...rows.map(r => r.value));
+  const total = rows.reduce((s, r) => s + r.value, 0) || 1;
+  return `<div class="hbars">${rows.map(r => `<button class="hbar ${drillable && r.key ? 'drill' : ''}" ${drillable && r.key ? `data-drill="${esc(r.key)}"` : 'tabindex="-1"'} title="${esc(r.label)}: ${esc(money(r.value))}">
+    <span class="hb-label">${esc(r.label)}</span><span class="hb-track"><span class="hb-fill" style="width:${(r.value / max * 100).toFixed(2)}%"></span></span>
+    <span class="hb-val">${esc(money(r.value))}</span><span class="hb-pct">${Math.round(r.value / total * 100)}%</span></button>`).join('')}</div>`;
+}
+function topRoundedRect(x, y, w, h, r) {
+  if (h <= 0) return '';
+  r = Math.min(r, w / 2, h);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+/* grouped columns: months × series */
+function columnsSVG(months, series) {
+  const W = 760, H = 300, L = 70, R = 10, T = 10, B = 34;
+  const pw = W - L - R, ph = H - T - B;
+  const vals = series.flatMap(s => s.values);
+  const nt = niceTicks(Math.min(0, ...vals), Math.max(0, ...vals), 4);
+  const y = v => T + ph - (v - nt.lo) / (nt.hi - nt.lo) * ph;
+  const gw = pw / months.length;
+  const bw = Math.max(2, Math.min(22, (gw - 6) / series.length - 2));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
+  for (const t of nt.ticks) s += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 8}" y="${y(t) + 4}" text-anchor="end">${esc(moneyCompact(t))}</text>`;
+  const every = Math.ceil(months.length / 8);
+  months.forEach((m, i) => {
+    const cx = L + gw * i + gw / 2;
+    const groupW = series.length * (bw + 2) - 2;
+    series.forEach((se, j) => {
+      const v = se.values[i], x = cx - groupW / 2 + j * (bw + 2);
+      if (v >= 0) s += `<path d="${topRoundedRect(x, y(v), bw, y(0) - y(v), 4)}" fill="${se.color}"/>`;
+      else s += `<rect x="${x}" y="${y(0)}" width="${bw}" height="${y(v) - y(0)}" fill="${se.color}" opacity=".7"/>`;
+    });
+    if (i % every === 0) s += `<text x="${cx}" y="${H - 12}" text-anchor="middle">${esc(fmtMonth(m))}</text>`;
+    const tip = `<b>${esc(fmtMonth(m))}</b><br>` + series.map(se => `${esc(se.name)}: ${esc(money(se.values[i]))}`).join('<br>') + (series.length === 2 ? `<br>Difference: ${esc(money(series[0].values[i] - series[1].values[i]))}` : '');
+    s += `<rect x="${L + gw * i}" y="${T}" width="${gw}" height="${ph}" fill="transparent" data-tip="${esc(tip)}" class="hit"/>`;
+  });
+  s += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--axis)" stroke-width="1"/></svg>`;
+  return s;
+}
+function lineSVG(months, values, name) {
+  const W = 760, H = 300, L = 70, R = 14, T = 12, B = 34;
+  const pw = W - L - R, ph = H - T - B;
+  const nt = niceTicks(Math.min(...values), Math.max(...values), 4);
+  const y = v => T + ph - (v - nt.lo) / (nt.hi - nt.lo) * ph;
+  const x = i => months.length === 1 ? L + pw / 2 : L + i / (months.length - 1) * pw;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" data-line='${esc(JSON.stringify({ months, values, name }))}'>`;
+  for (const t of nt.ticks) s += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)"/><text x="${L - 8}" y="${y(t) + 4}" text-anchor="end">${esc(moneyCompact(t))}</text>`;
+  if (nt.lo < 0 && nt.hi > 0) s += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--axis)"/>`;
+  const every = Math.ceil(months.length / 10);
+  months.forEach((m, i) => { if (i % every === 0) s += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle">${esc(fmtMonth(m))}</text>`; });
+  s += `<path d="${values.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(v).toFixed(1)).join('')}" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"/>`;
+  if (months.length === 1) s += `<circle cx="${x(0)}" cy="${y(values[0])}" r="4" fill="var(--s1)"/>`;
+  s += `<line class="xh" x1="0" x2="0" y1="${T}" y2="${T + ph}" stroke="var(--axis)" visibility="hidden"/><circle class="xd" r="5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>`;
+  s += `<rect class="ov" x="${L}" y="${T}" width="${pw}" height="${ph}" fill="transparent" data-geo='${esc(JSON.stringify({ L, pw, T, ph, lo: nt.lo, hi: nt.hi }))}'/></svg>`;
+  return s;
+}
+function wireCharts(root) {
+  const tip = $('#tip');
+  const show = (html, e) => { tip.innerHTML = html; tip.style.display = 'block'; const r = tip.getBoundingClientRect(); let x = e.clientX + 14, y = e.clientY + 14; if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14; if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14; tip.style.left = x + 'px'; tip.style.top = y + 'px'; };
+  const hide = () => { tip.style.display = 'none'; };
+  $$('.hit', root).forEach(el => { el.addEventListener('mousemove', e => show(el.dataset.tip, e)); el.addEventListener('mouseleave', hide); });
+  $$('svg[data-line]', root).forEach(svg => {
+    const data = JSON.parse(svg.dataset.line), ov = $('.ov', svg), g = JSON.parse(ov.dataset.geo);
+    const xh = $('.xh', svg), xd = $('.xd', svg);
+    ov.addEventListener('mousemove', e => {
+      const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+      const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+      const n = data.months.length;
+      const i = n === 1 ? 0 : Math.max(0, Math.min(n - 1, Math.round((p.x - g.L) / g.pw * (n - 1))));
+      const cx = n === 1 ? g.L + g.pw / 2 : g.L + i / (n - 1) * g.pw;
+      const cy = g.T + g.ph - (data.values[i] - g.lo) / (g.hi - g.lo) * g.ph;
+      xh.setAttribute('x1', cx); xh.setAttribute('x2', cx); xh.setAttribute('visibility', 'visible');
+      xd.setAttribute('cx', cx); xd.setAttribute('cy', cy); xd.setAttribute('visibility', 'visible');
+      show(`<b>${esc(fmtMonth(data.months[i]))}</b><br>${esc(data.name)}: ${esc(money(data.values[i]))}`, e);
+    });
+    ov.addEventListener('mouseleave', () => { hide(); xh.setAttribute('visibility', 'hidden'); xd.setAttribute('visibility', 'hidden'); });
+  });
+}
+
+/* ---------- Reports ---------- */
+const REPORTS = [
+  ['spending', 'Spending by category'],
+  ['income', 'Income by category'],
+  ['incexp', 'Income vs. spending'],
+  ['trend', 'Category over time'],
+  ['networth', 'Net worth over time'],
+  ['balances', 'Account balances'],
+];
+function spendingRows(flows, drill, kind) {
+  kind = kind || 'expense';
+  const sign = kind === 'expense' ? -1 : 1;
+  const I = idx();
+  const m = new Map();
+  for (const [k, v] of flows) {
+    if (catKind(k) !== kind) continue;
+    let key, label;
+    if (k === '_in' || k === '_out') { if (drill) continue; key = k; label = 'Uncategorized'; }
+    else {
+      const c = I.cat.get(k), top = topCat(k);
+      if (!drill) { key = top.id; label = top.name; }
+      else { if (top.id !== drill) continue; key = c.id; label = c.parentId ? c.name : top.name + ' (general)'; }
+    }
+    const e = m.get(key) || { key, label, value: 0 };
+    e.value += v * sign; m.set(key, e);
+  }
+  return Array.from(m.values()).filter(r => r.value > 0).sort((a, b) => b.value - a.value);
+}
+function txForCategory(from, to, accountId, catId) {
+  const out = [];
+  for (const t of DB.transactions) {
+    if (t.linkId || t.ob || t.date < from || t.date > to) continue;
+    if (accountId !== 'all' && t.accountId !== accountId) continue;
+    if (t.splits && t.splits.length) { for (const s of t.splits) if ((s.categoryId || (s.transferAccountId ? null : (s.amount > 0 ? '_in' : '_out'))) === catId) out.push({ t, amount: s.amount, memo: s.memo || t.memo }); }
+    else if (!t.transferAccountId && (t.categoryId || (t.amount > 0 ? '_in' : '_out')) === catId) out.push({ t, amount: t.amount, memo: t.memo });
+  }
+  return out.sort((a, b) => cmpTx(a.t, b.t));
+}
+function clampMonths(from, to) {
+  const [lo, hi] = dataDateRange();
+  if (!lo) return [];
+  const f = (from > lo ? from : lo).slice(0, 7);
+  const tt = (to < hi ? to : (hi > todayISO() ? hi : (to < todayISO() ? to : todayISO()))).slice(0, 7);
+  return monthsBetween(f, tt);
+}
+function viewReports() {
+  const rs = reportState;
+  const [from, to] = periodRange(rs.period, rs.custom);
+  const accSel = `<select id="rp-acc"><option value="all">All accounts</option>${DB.accounts.map(a => `<option value="${a.id}" ${rs.account === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`;
+  const periodSel = `<select id="rp-period">${PERIODS.map(([k, l]) => `<option value="${k}" ${rs.period === k ? 'selected' : ''}>${l}</option>`).join('')}</select>${rs.period === 'custom' ? ` <input type="date" id="rp-from" value="${esc(rs.custom.from || '')}"> to <input type="date" id="rp-to" value="${esc(rs.custom.to || '')}">` : ''}`;
+  let content = '', csv = null;
+  const I = idx();
+  const title = (REPORTS.find(r => r[0] === rs.type) || REPORTS[0])[1];
+  const accLabel = rs.account === 'all' ? 'All accounts' : accName(rs.account);
+
+  if (rs.type === 'spending' || rs.type === 'income') {
+    const kind = rs.type === 'spending' ? 'expense' : 'income';
+    const flows = categoryFlows(from, to, rs.account);
+    if (rs.drill2) {
+      const list = txForCategory(from, to, rs.account, rs.drill2);
+      const total = list.reduce((s, x) => s + x.amount, 0);
+      const lab = rs.drill2 === '_in' || rs.drill2 === '_out' ? 'Uncategorized' : catName(rs.drill2);
+      content = `<div class="crumbs"><button class="btn link" data-rdrill="">All categories</button>${rs.drill ? ` › <button class="btn link" data-rdrill="${esc(rs.drill)}">${esc(catName(rs.drill))}</button>` : ''} › ${esc(lab)}</div>
+        <table class="t"><thead><tr><th>Date</th><th>Account</th><th>Payee</th><th>Memo</th><th class="num">Amount</th></tr></thead><tbody>
+        ${list.map(x => `<tr class="click" data-acc="${x.t.accountId}"><td>${fmtDate(x.t.date)}</td><td>${esc(accName(x.t.accountId))}</td><td>${esc(x.t.payee)}</td><td class="muted">${esc(x.memo)}</td><td class="num">${moneyHTML(x.amount)}</td></tr>`).join('')}
+        </tbody><tfoot><tr><td colspan="4">Total (${list.length} transactions)</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>`;
+      csv = [['Date', 'Account', 'Payee', 'Memo', 'Amount']].concat(list.map(x => [fmtDate(x.t.date), accName(x.t.accountId), x.t.payee, x.memo, moneyPlain(x.amount)]));
+    } else {
+      const rows = spendingRows(flows, rs.drill, kind);
+      const total = rows.reduce((s, r) => s + r.value, 0);
+      const hasSubs = k => k !== '_in' && k !== '_out' && (I.childrenOf.get(k) || []).length > 0;
+      rows.forEach(r => { r.drillTo = (!rs.drill && hasSubs(r.key)) ? 'cat' : 'tx'; });
+      content = `${rs.drill ? `<div class="crumbs"><button class="btn link" data-rdrill="">All categories</button> › ${esc(catName(rs.drill))}</div>` : `<div class="crumbs muted">Click a category to see ${'its details'}.</div>`}
+        ${rows.length ? hbarsHTML(rows, true) + `<table class="t" style="margin-top:18px"><thead><tr><th>Category</th><th class="num">Amount</th><th class="num">Share</th></tr></thead><tbody>
+          ${rows.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${esc(money(r.value))}</td><td class="num muted">${(r.value / total * 100).toFixed(1)}%</td></tr>`).join('')}
+          </tbody><tfoot><tr><td>Total</td><td class="num">${esc(money(total))}</td><td></td></tr></tfoot></table>`
+        : `<p class="muted">Nothing recorded in this period.</p>`}`;
+      csv = [['Category', 'Amount']].concat(rows.map(r => [r.label, moneyPlain(r.value)]));
+    }
+  } else if (rs.type === 'incexp') {
+    const months = clampMonths(from, to);
+    const inc = [], exp = [];
+    for (const m of months) { const { income, expense } = sumByKind(categoryFlows(m + '-01', m + '-31', rs.account)); inc.push(income); exp.push(expense); }
+    const ti = inc.reduce((a, b) => a + b, 0), te = exp.reduce((a, b) => a + b, 0);
+    content = months.length ? `<div class="legend"><span><i style="background:var(--s1)"></i>Income</span><span><i style="background:var(--s2)"></i>Spending</span></div>
+      <div class="chart">${columnsSVG(months, [{ name: 'Income', color: 'var(--s1)', values: inc }, { name: 'Spending', color: 'var(--s2)', values: exp }])}</div>
+      <table class="t" style="margin-top:18px"><thead><tr><th>Month</th><th class="num">Income</th><th class="num">Spending</th><th class="num">Difference</th></tr></thead><tbody>
+      ${months.map((m, i) => `<tr><td>${esc(fmtMonth(m))}</td><td class="num">${esc(money(inc[i]))}</td><td class="num">${esc(money(exp[i]))}</td><td class="num">${moneyHTML(inc[i] - exp[i])}</td></tr>`).reverse().join('')}
+      </tbody><tfoot><tr><td>Total</td><td class="num">${esc(money(ti))}</td><td class="num">${esc(money(te))}</td><td class="num">${moneyHTML(ti - te)}</td></tr>
+      <tr><td class="muted">Average per month</td><td class="num muted">${esc(money(Math.round(ti / months.length)))}</td><td class="num muted">${esc(money(Math.round(te / months.length)))}</td><td class="num muted">${esc(money(Math.round((ti - te) / months.length)))}</td></tr></tfoot></table>` : '<p class="muted">Nothing recorded in this period.</p>';
+    csv = [['Month', 'Income', 'Spending', 'Difference']].concat(months.map((m, i) => [m, moneyPlain(inc[i]), moneyPlain(exp[i]), moneyPlain(inc[i] - exp[i])]));
+  } else if (rs.type === 'trend') {
+    const months = clampMonths(from, to);
+    const cid = rs.catSel;
+    let vals = [];
+    if (cid) {
+      const kind = catKind(cid), sign = kind === 'expense' ? -1 : 1;
+      const ids = new Set([cid, ...(I.childrenOf.get(cid) || []).map(c => c.id)]);
+      vals = months.map(m => { let v = 0; for (const [k, x] of categoryFlows(m + '-01', m + '-31', rs.account)) if (ids.has(k)) v += x * sign; return v; });
+    }
+    const tot = vals.reduce((a, b) => a + b, 0);
+    content = `<div class="toolbar"><label style="margin:0;display:flex;gap:8px;align-items:center">Category <select id="rp-cat" style="width:auto">${catOptions(cid ? 'c:' + cid : '', null, { noTransfers: true, noNew: true, noneLabel: '— Choose a category —' })}</select></label></div>
+      ${!cid ? '<p class="muted">Choose a category to see how it changed month by month.</p>' : months.length ? `<div class="chart">${columnsSVG(months, [{ name: catName(cid), color: 'var(--s1)', values: vals }])}</div>
+      <p class="sub">Total ${esc(money(tot))} · average ${esc(money(Math.round(tot / months.length)))} per month${(I.childrenOf.get(cid) || []).length ? ' · includes subcategories' : ''}</p>
+      <table class="t" style="margin-top:12px"><thead><tr><th>Month</th><th class="num">${esc(catName(cid))}</th></tr></thead><tbody>${months.map((m, i) => `<tr><td>${esc(fmtMonth(m))}</td><td class="num">${esc(money(vals[i]))}</td></tr>`).reverse().join('')}</tbody></table>` : '<p class="muted">Nothing recorded in this period.</p>'}`;
+    if (cid) csv = [['Month', catName(cid)]].concat(months.map((m, i) => [m, moneyPlain(vals[i])]));
+  } else if (rs.type === 'networth') {
+    const months = clampMonths(from, to);
+    const accs = rs.account === 'all' ? DB.accounts.map(a => a.id) : [rs.account];
+    const set = new Set(accs);
+    const txs = DB.transactions.filter(t => set.has(t.accountId)).sort(cmpTx);
+    const vals = []; let run = 0, i = 0;
+    for (const m of months) { const end = m + '-31'; while (i < txs.length && txs[i].date <= end) run += txs[i++].amount; vals.push(run); }
+    content = months.length ? `<div class="chart">${lineSVG(months, vals, rs.account === 'all' ? 'Net worth' : accName(rs.account))}</div>
+      <table class="t" style="margin-top:18px"><thead><tr><th>End of month</th><th class="num">${rs.account === 'all' ? 'Net worth' : 'Balance'}</th><th class="num">Change</th></tr></thead><tbody>
+      ${months.map((m, k) => `<tr><td>${esc(fmtMonth(m))}</td><td class="num">${moneyHTML(vals[k])}</td><td class="num">${k ? moneyHTML(vals[k] - vals[k - 1]) : ''}</td></tr>`).reverse().join('')}</tbody></table>` : '<p class="muted">No data yet.</p>';
+    csv = [['Month', 'Value']].concat(months.map((m, k) => [m, moneyPlain(vals[k])]));
+  } else if (rs.type === 'balances') {
+    const asOf = to > todayISO() ? todayISO() : to;
+    const rows = [];
+    let total = 0;
+    for (const [label, types] of ACCOUNT_GROUPS) {
+      for (const a of DB.accounts.filter(x => types.includes(x.type)).sort((x, y) => x.name.localeCompare(y.name))) {
+        const b = (I.byAcc.get(a.id) || []).filter(t => t.date <= asOf).reduce((s, t) => s + t.amount, 0);
+        if (a.closed && !b) continue;
+        rows.push([label, a.name, b]); total += b;
+      }
+    }
+    content = `<p class="sub" style="margin-top:0">Balances on ${fmtDate(asOf)} (end of the chosen period).</p>
+      <table class="t"><thead><tr><th>Group</th><th>Account</th><th class="num">Balance</th></tr></thead><tbody>
+      ${rows.map(r => `<tr><td class="muted">${esc(r[0])}</td><td>${esc(r[1])}</td><td class="num">${moneyHTML(r[2])}</td></tr>`).join('')}
+      </tbody><tfoot><tr><td></td><td>Net worth</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>`;
+    csv = [['Group', 'Account', 'Balance']].concat(rows.map(r => [r[0], r[1], moneyPlain(r[2])]));
+  }
+  reportState._csv = csv;
+  const showAcc = rs.type !== 'balances';
+  return `<div class="page">
+    <div class="head"><div class="grow"><h1>Reports</h1></div></div>
+    <div class="tabs">${REPORTS.map(([k, l]) => `<button data-rtype="${k}" class="${rs.type === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="toolbar">${periodSel} ${showAcc ? accSel : ''}<span class="grow"></span>
+      ${csv ? '<button class="btn small" data-act="report-csv">Export to spreadsheet</button>' : ''}<button class="btn small" data-act="print">Print</button></div>
+    <div class="card"><h2>${esc(title)} <span class="hint">· ${esc(periodLabel(rs.period, rs.custom))}${showAcc ? ' · ' + esc(accLabel) : ''}</span></h2>${content}</div>
+  </div>`;
+}
+
+/* ---------- Categories view ---------- */
+function viewCategories() {
+  const I = idx();
+  const counts = new Map();
+  for (const t of DB.transactions) {
+    if (t.categoryId) counts.set(t.categoryId, (counts.get(t.categoryId) || 0) + 1);
+    if (t.splits) for (const s of t.splits) if (s.categoryId) counts.set(s.categoryId, (counts.get(s.categoryId) || 0) + 1);
+  }
+  const row = (c, child) => `<div class="catrow ${child ? 'child' : ''}"><span class="nm">${esc(c.name)}</span><span class="pill">${(counts.get(c.id) || 0).toLocaleString()} uses</span>
+    <span class="acts">${!child ? `<button class="btn link" data-cat-sub="${c.id}">+ Sub</button>` : ''}<button class="btn link" data-cat-ren="${c.id}">Rename</button>${!child ? `<button class="btn link" data-cat-kind="${c.id}">Make ${c.kind === 'expense' ? 'income' : 'expense'}</button>` : ''}<button class="btn link" data-cat-del="${c.id}" style="color:var(--neg)">Delete</button></span></div>`;
+  const block = kind => sortedTopCats(kind).map(t => row(t, false) + (I.childrenOf.get(t.id) || []).map(s => row(s, true)).join('')).join('') || '<p class="muted">None yet.</p>';
+  return `<div class="page"><div class="head"><div class="grow"><h1>Categories</h1><p class="sub">Deleting a category lets you move its transactions to another one, which is also how you merge categories.</p></div>
+    <button class="btn primary" data-act="cat-add">+ New category</button></div>
+    <div class="cols2"><div class="card"><h2>Expenses</h2>${block('expense')}</div><div class="card"><h2>Income</h2>${block('income')}</div></div></div>`;
+}
+async function deleteCategory(id) {
+  const I = idx(), c = I.cat.get(id); if (!c) return;
+  const subs = I.childrenOf.get(id) || [];
+  const ids = new Set([id, ...subs.map(s => s.id)]);
+  let n = 0;
+  for (const t of DB.transactions) { if (ids.has(t.categoryId)) n++; if (t.splits) for (const s of t.splits) if (ids.has(s.categoryId)) n++; }
+  const w = openModal({
+    title: 'Delete “' + esc(c.name) + '”', body: `<form>
+    <p>${subs.length ? `This also deletes its ${subs.length} subcategories. ` : ''}${n ? `It is used <b>${n.toLocaleString()}</b> times.` : 'It is not used by any transaction.'}</p>
+    ${n ? `<label>Move those transactions to<select name="to">${catOptions('', null, { noTransfers: true, noNew: true, noneLabel: '— Leave uncategorized —' }).replace(new RegExp(`<option value="c:(${Array.from(ids).join('|')})"[^>]*>[^<]*</option>`, 'g'), '')}</select></label>` : ''}
+    <div class="modal-actions"><span class="spacer"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn danger">Delete</button></div></form>`
+  });
+  $('form', w).onsubmit = e => {
+    e.preventDefault();
+    const to = n && e.target.to.value ? e.target.to.value.slice(2) : null;
+    for (const t of DB.transactions) { if (ids.has(t.categoryId)) t.categoryId = to; if (t.splits) for (const s of t.splits) if (ids.has(s.categoryId)) s.categoryId = to; }
+    DB.categories = DB.categories.filter(x => !ids.has(x.id));
+    changed(); closeModal(w); render();
+  };
+}
+
+/* ---------- Settings ---------- */
+function viewSettings() {
+  const s = DB.settings;
+  const cur = ['EUR', 'USD', 'GBP', 'CHF', 'SEK', 'NOK', 'DKK', 'CAD', 'AUD', 'JPY'];
+  const loc = [['nl-NL', 'Dutch (1.234,56 · 23-10-2026)'], ['nl-BE', 'Belgian Dutch'], ['de-DE', 'German'], ['fr-FR', 'French'], ['en-GB', 'English, UK (1,234.56 · 23/10/2026)'], ['en-US', 'English, US (1,234.56 · 10/23/2026)']];
+  const last = DB.lastBackup ? new Date(DB.lastBackup).toLocaleString(s.locale) : 'never';
+  return `<div class="page"><div class="head"><div class="grow"><h1>Settings &amp; backup</h1></div></div>
+  <div class="cards">
+    <div class="card"><h2>Kasboek as an app</h2>
+      ${isInstalledApp() ? `<p class="sub" style="margin-top:0">You are using the installed Kasboek app. Updates arrive automatically the next time you start it while connected to the internet.</p>`
+      : installPrompt ? `<p class="sub" style="margin-top:0">Install Kasboek as a program with its own icon in the Dock or Start menu. It then opens in its own window, also without internet.</p><div class="row" style="margin-top:12px"><button class="btn primary" data-act="install">Install Kasboek</button></div>`
+      : IS_WEB ? `<p class="sub" style="margin-top:0">To install Kasboek as a program, use <b>Google Chrome</b> or <b>Microsoft Edge</b>: click the install icon at the right end of the address bar, or open the browser menu and choose <b>Install Kasboek…</b> (in Chrome under “Cast, save and share”, in Edge under “Apps”).</p>`
+      : `<p class="sub" style="margin-top:0">You opened Kasboek as a file. To install it as a program, open it from its web address in Chrome or Edge.</p>`}
+      <p class="hint" style="margin-top:10px">Kasboek version ${APP_VERSION}</p>
+    </div>
+    <div class="card"><h2>Use Kasboek on two computers</h2>
+      ${!fsSupported ? `<p class="sub" style="margin-top:0">To share your data with another computer, open Kasboek in <b>Google Chrome</b> (Mac or Windows) or <b>Microsoft Edge</b> (Windows). This browser cannot save to a shared file.</p>`
+      : fileHandle ? `<p class="sub" style="margin-top:0">Kasboek saves everything in the shared file <b>${esc(fileHandle.name)}</b>. Changes from the other computer are picked up automatically, usually within a minute.</p>
+        <div class="row" style="flex-wrap:wrap;margin-top:12px">
+          ${fileStatus === 'needs-permission' ? '<button class="btn primary" data-act="fs-reconnect">Open shared file</button>' : '<button class="btn" data-act="fs-sync">Check for changes now</button>'}
+          <button class="btn" data-act="fs-merge">Combine with another file…</button>
+          <button class="btn" data-act="fs-stop">Stop sharing</button></div>
+        <p class="hint" style="margin-top:12px">If you both change things at exactly the same moment, the cloud service may keep a second copy, for example “Kasboek data (1).json”. Use “Combine with another file…” on that copy, then delete it.</p>`
+      : `<p class="sub" style="margin-top:0">Put Kasboek's data in a folder that both computers can reach, such as iCloud Drive, OneDrive, Dropbox or Google Drive. Both of you then work in the same data, and changes made at the same time are combined.</p>
+        <ol class="steps">
+          <li>On the computer that has your data: click <b>Create shared file…</b> and save it in the shared folder.</li>
+          <li>On the other computer: open Kasboek in Chrome or Edge, click <b>Open existing shared file…</b> and choose that same file.</li>
+        </ol>
+        <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-act="fs-create">Create shared file…</button><button class="btn" data-act="fs-open">Open existing shared file…</button></div>`}
+    </div>
+    <div class="card"><h2>Backup</h2>
+      <p class="sub" style="margin-top:0">Kasboek saves every change automatically in this browser on this computer. A backup file is your safety net: save one regularly and keep a copy elsewhere (for example on iCloud Drive or a USB stick). Last backup file: <b>${esc(last)}</b>.</p>
+      <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-act="save-backup">Save backup file</button><button class="btn" data-act="open-backup">Open backup file…</button></div>
+    </div>
+    <div class="card"><h2>Display</h2>
+      <div class="grid2">
+        <label>Currency<select id="set-cur">${cur.map(c => `<option ${s.currency === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+        <label>Number and date format<select id="set-loc">${loc.map(([k, l]) => `<option value="${k}" ${s.locale === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label>Appearance<select id="set-theme"><option value="system" ${s.theme === 'system' ? 'selected' : ''}>Same as this computer</option><option value="light" ${s.theme === 'light' ? 'selected' : ''}>Light</option><option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>Dark</option></select></label>
+      </div>
+      <p class="hint">Example: ${esc(money(-123456))} on ${esc(fmtDate(todayISO()))}</p>
+    </div>
+    <div class="card"><h2>Your data</h2>
+      <p class="sub" style="margin-top:0">${DB.accounts.length} accounts · ${DB.categories.length} categories · ${DB.transactions.length.toLocaleString()} transactions${(() => { const [a, b] = dataDateRange(); return a ? ` · from ${fmtDate(a)} to ${fmtDate(b)}` : ''; })()}</p>
+      <div class="row" style="margin-top:12px"><button class="btn danger" data-act="erase">Erase all data…</button></div>
+    </div>
+  </div></div>`;
+}
+function applyTheme() { const t = DB.settings.theme; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
+
+/* ===================================================================
+   QIF import (Microsoft Money export)
+   =================================================================== */
+let importPlan = null;
+function decodeBytes(buf) { try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { return new TextDecoder('windows-1252').decode(buf); } }
+
+function parseQIF(text) {
+  const lines = text.replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
+  const sections = [];
+  let mode = null, rec = {}, sec = null, curAcct = null;
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    if (!line) continue;
+    if (line[0] === '!') {
+      const h = line.slice(1).trim(), hl = h.toLowerCase();
+      if (hl.startsWith('option:') || hl.startsWith('clear:')) continue;
+      if (hl === 'account') { mode = 'account'; rec = {}; continue; }
+      if (hl.startsWith('type:')) { mode = 'type'; sec = { type: h.slice(5).trim(), account: curAcct, records: [] }; sections.push(sec); rec = {}; continue; }
+      mode = 'skip'; continue;
+    }
+    if (mode === 'account') {
+      if (line[0] === '^') { curAcct = { name: (rec.N || '').trim(), type: (rec.T || '').trim() }; rec = {}; }
+      else rec[line[0]] = line.slice(1);
+      continue;
+    }
+    if (mode === 'type') {
+      if (line[0] === '^') { if (Object.keys(rec).length) sec.records.push(rec); rec = {}; continue; }
+      const c = line[0], v = line.slice(1);
+      if (c === 'S' || c === 'E' || c === '$') {
+        rec.splits = rec.splits || [];
+        let last = rec.splits[rec.splits.length - 1];
+        if (c === 'S' || !last || (c in last)) { last = {}; rec.splits.push(last); }
+        last[c] = v;
+      } else if (!(c in rec)) rec[c] = v;
+      else if (c === 'A' || c === 'M') rec[c] += ' ' + v;
+    }
+  }
+  if (mode === 'type' && sec && Object.keys(rec).length) sec.records.push(rec);
+  return sections;
+}
+function qifDateParts(s) {
+  s = String(s || '').trim();
+  const apos = s.indexOf("'") >= 0;
+  let p = s.split(/[^0-9]+/).filter(Boolean);
+  if (p.length === 1 && p[0].length === 8) p = [p[0].slice(0, 4), p[0].slice(4, 6), p[0].slice(6)];
+  return { p, apos };
+}
+function detectDateOrder(dates) {
+  let first12 = false, second12 = false, ymd = false;
+  for (const d of dates) {
+    const { p } = qifDateParts(d);
+    if (p.length < 3) continue;
+    if (p[0].length === 4) { ymd = true; continue; }
+    if (+p[0] > 12) first12 = true;
+    if (+p[1] > 12) second12 = true;
+  }
+  if (ymd) return 'YMD';
+  if (first12 && !second12) return 'DMY';
+  if (second12 && !first12) return 'MDY';
+  return null;
+}
+function parseQifDate(s, order) {
+  const { p, apos } = qifDateParts(s);
+  if (p.length < 3) return null;
+  let y, m, d;
+  if (order === 'YMD' || p[0].length === 4) [y, m, d] = p.map(Number);
+  else if (order === 'MDY') { m = +p[0]; d = +p[1]; y = +p[2]; }
+  else { d = +p[0]; m = +p[1]; y = +p[2]; }
+  if (String(p[2]).length <= 2 && !(order === 'YMD' || p[0].length === 4)) y = apos ? 2000 + y : (y < 50 ? 2000 + y : 1900 + y);
+  if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31 && y > 1900)) return null;
+  return isoOf(y, m, d);
+}
+function detectDecimalComma(amounts) {
+  let comma = 0, dot = 0;
+  for (const a of amounts) { const s = String(a).trim(); if (/,\d{1,2}$/.test(s)) comma++; else if (/\.\d{1,2}$/.test(s)) dot++; }
+  return comma > dot;
+}
+function parseQifAmount(s, comma) {
+  s = String(s || '').trim().replace(/\s/g, '');
+  if (!s) return null;
+  s = comma ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  const v = Math.round(parseFloat(s) * 100);
+  return isFinite(v) ? v : null;
+}
+function splitCatField(v) {
+  v = String(v || '').trim();
+  if (!v) return { cat: null, transfer: null };
+  if (v[0] === '[') { const e = v.indexOf(']'); return { cat: null, transfer: v.slice(1, e > 0 ? e : undefined).trim() }; }
+  const slash = v.indexOf('/');
+  if (slash >= 0) v = v.slice(0, slash);
+  return { cat: v.trim() || null, transfer: null };
+}
+const QIF_TX_TYPES = { 'bank': 'checking', 'cash': 'cash', 'ccard': 'credit', 'oth a': 'asset', 'oth l': 'liability' };
+function qifAcctType(t) { return QIF_TX_TYPES[String(t || '').toLowerCase()] || 'checking'; }
+
+async function readQifFiles(files) {
+  const plan = { files: [] };
+  for (const file of files) {
+    const text = decodeBytes(await file.arrayBuffer());
+    const sections = parseQIF(text);
+    const groups = new Map();
+    const cats = [];
+    let invst = 0, other = 0;
+    for (const s of sections) {
+      const tl = s.type.toLowerCase();
+      if (tl === 'cat') { for (const r of s.records) if (r.N) cats.push({ name: r.N, kind: ('I' in r) ? 'income' : 'expense' }); continue; }
+      if (tl === 'invst') { invst += s.records.length; continue; }
+      if (!(tl in QIF_TX_TYPES)) { other += s.records.length; continue; }
+      const key = s.account && s.account.name ? s.account.name.toLowerCase() : '__unnamed';
+      if (!groups.has(key)) groups.set(key, { qifName: s.account && s.account.name || null, qifType: s.type, records: [] });
+      groups.get(key).records.push(...s.records);
+    }
+    const allRecs = Array.from(groups.values()).flatMap(g => g.records);
+    const dates = allRecs.map(r => r.D).filter(Boolean);
+    const amounts = allRecs.flatMap(r => [r.T || r.U, ...(r.splits || []).map(s => s.$)]).filter(Boolean);
+    const detected = detectDateOrder(dates);
+    const base = file.name.replace(/\.qif$/i, '');
+    const accounts = Array.from(groups.values()).map(g => {
+      // Money's export starts with an "Opening Balance" line that names the account itself: L[Account name]
+      let guess = g.qifName;
+      if (!guess) { const ob = g.records.find(r => /opening balance/i.test(r.P || '') && /^\[.+\]/.test(r.L || '')); if (ob) guess = splitCatField(ob.L).transfer; }
+      const name = guess || base;
+      const existing = DB.accounts.find(a => a.name.toLowerCase() === name.toLowerCase());
+      const ds = g.records.map(r => r.D).filter(Boolean);
+      return { qifName: name, type: qifAcctType(g.qifType), records: g.records, target: existing ? existing.id : 'new', newName: name, firstDate: ds[0], lastDate: ds[ds.length - 1] };
+    });
+    plan.files.push({ name: file.name, accounts, cats, invst, other, dateOrder: detected || (localeDecimal() === ',' ? 'DMY' : 'MDY'), detectedOrder: detected, comma: detectDecimalComma(amounts), sample: dates[0] || '' });
+  }
+  return plan;
+}
+
+function runImport(plan) {
+  const st = { tx: 0, matched: 0, dupes: 0, newAccounts: [], autoAccounts: [], cats: 0, invst: 0, badDates: 0 };
+  const before = DB.categories.length;
+  // 1. categories with their income/expense type
+  for (const f of plan.files) for (const c of f.cats) { const r = findOrCreateCategory(c.name, c.kind); }
+  // 2. accounts chosen in the plan
+  const nameMap = new Map();
+  for (const f of plan.files) for (const g of f.accounts) {
+    if (g.skip) continue;
+    let id = g.target;
+    if (id === 'new') {
+      const nm = (g.newName || g.qifName || 'Imported account').trim();
+      let ex = DB.accounts.find(a => a.name.toLowerCase() === nm.toLowerCase());
+      if (!ex) { ex = { id: uid(), name: nm, type: g.type, note: '', closed: false }; DB.accounts.push(ex); st.newAccounts.push(nm); }
+      id = ex.id;
+    }
+    g._id = id;
+    nameMap.set(String(g.qifName).toLowerCase(), id);
+    nameMap.set(accName(id).toLowerCase(), id);
+  }
+  _idx = null;
+  const resolveAcc = name => {
+    const k = name.toLowerCase();
+    if (nameMap.has(k)) return nameMap.get(k);
+    let a = DB.accounts.find(x => x.name.toLowerCase() === k);
+    if (!a) { a = { id: uid(), name, type: 'checking', note: '', closed: false }; DB.accounts.push(a); st.autoAccounts.push(name); }
+    nameMap.set(k, a.id); return a.id;
+  };
+  const existingKeys = new Set(DB.transactions.filter(t => t.ik).map(t => t.ik));
+  const statusOf = c => { c = String(c || '').trim().toUpperCase(); return c === '*' || c === 'C' ? 'c' : (c === 'X' || c === 'R') ? 'R' : ''; };
+  const catIdFor = (path, amount) => path ? findOrCreateCategory(path, amount > 0 ? 'income' : 'expense').cat.id : null;
+
+  for (const f of plan.files) {
+    st.invst += f.invst;
+    for (const g of f.accounts) {
+      if (g.skip) continue;
+      const acctId = g._id;
+      const occ = new Map();
+      for (const r of g.records) {
+        const date = parseQifDate(r.D, f.dateOrder);
+        if (!date) { st.badDates++; continue; }
+        const amount = parseQifAmount(r.T != null ? r.T : r.U, f.comma) || 0;
+        const payee = (r.P || '').trim(), memo = (r.M || '').trim(), num = (r.N || '').trim(), status = statusOf(r.C);
+        const base = [acctId, date, amount, payee, num, memo].join('|');
+        const n = (occ.get(base) || 0) + 1; occ.set(base, n);
+        const ik = base + '|' + n;
+        if (existingKeys.has(ik)) { st.dupes++; continue; }
+        existingKeys.add(ik);
+        const lf = splitCatField(r.L);
+        const hasSplits = r.splits && r.splits.length > 1 || (r.splits && r.splits.length === 1 && r.splits[0].$ != null && parseQifAmount(r.splits[0].$, f.comma) !== amount);
+        // opening balance: a transfer to the account itself
+        if (!r.splits && lf.transfer && resolveAcc(lf.transfer) === acctId) {
+          newTx({ accountId: acctId, date, amount, payee: payee || 'Opening balance', memo, num, status: status || 'R', ob: true, ik }); st.tx++; continue;
+        }
+        if (!hasSplits) {
+          const single = r.splits && r.splits.length === 1 ? splitCatField(r.splits[0].S) : lf;
+          if (single.transfer) {
+            const other = resolveAcc(single.transfer);
+            if (other !== acctId) {
+              // the other side may already be here from an earlier file → match instead of duplicating
+              const leg = DB.transactions.find(t => t.linkId && !t.ik && t.accountId === acctId && t.date === date && t.amount === amount && (idxTx(t.linkId) || {}).accountId === other);
+              if (leg) { leg.ik = ik; if (status) leg.status = status; if (num) leg.num = num; if (memo && !leg.memo) leg.memo = memo; st.matched++; continue; }
+              const t = newTx({ accountId: acctId, date, amount, payee, memo, num, status, transferAccountId: other, ik });
+              syncLegs(t); st.tx++; continue;
+            }
+          }
+          newTx({ accountId: acctId, date, amount, payee, memo, num, status, categoryId: catIdFor(single.cat, amount), ik }); st.tx++; continue;
+        }
+        // split transaction
+        const t = newTx({ accountId: acctId, date, amount, payee, memo, num, status, ik, splits: [] });
+        for (const s of r.splits) {
+          const sf = splitCatField(s.S), sa = parseQifAmount(s.$, f.comma) || 0;
+          const line = { categoryId: null, transferAccountId: null, memo: (s.E || '').trim(), amount: sa };
+          if (sf.transfer) {
+            const other = resolveAcc(sf.transfer);
+            if (other !== acctId) {
+              line.transferAccountId = other;
+              // absorb a plain transfer already imported from the other account
+              const ex = DB.transactions.find(x => !x.linkId && !x.splits && x.accountId === other && x.transferAccountId === acctId && x.date === date && x.amount === -sa && x.ik);
+              if (ex) { line._absorb = { status: ex.status, num: ex.num, ik: ex.ik }; deleteTx(ex); st.matched++; }
+            }
+          } else line.categoryId = catIdFor(sf.cat, sa);
+          t.splits.push(line);
+        }
+        _idx = null;
+        syncLegs(t);
+        t.splits.forEach((s, i) => { if (s._absorb) { const leg = DB.transactions.find(x => x.linkId === t.id && x.linkKey === i); if (leg) Object.assign(leg, s._absorb); delete s._absorb; } });
+        st.tx++;
+      }
+    }
+  }
+  st.cats = DB.categories.length - before;
+  changed();
+  return st;
+}
+function idxTx(id) { return DB.transactions.find(t => t.id === id); }
+
+function viewImport() {
+  const p = importPlan;
+  let planHTML = '';
+  if (p) {
+    planHTML = p.files.map((f, fi) => {
+      const ex = f.sample ? parseQifDate(f.sample, f.dateOrder) : null;
+      return `<div class="card" style="margin-top:16px"><h2>${esc(f.name)}</h2>
+      ${f.accounts.length ? '' : '<p class="muted">No bank, cash or credit-card transactions found in this file.</p>'}
+      ${f.accounts.map((g, gi) => `<div style="border-top:1px solid var(--line);padding:12px 0">
+        <div style="margin-bottom:8px"><b>${esc(g.qifName)}</b> <span class="muted">· ${g.records.length.toLocaleString()} transactions${g.firstDate ? ` · ${esc(g.firstDate)} … ${esc(g.lastDate)}` : ''}</span></div>
+        <div class="grid2">
+          <label style="margin:0">Import into<select data-imp="${fi}:${gi}:target">
+            <option value="new" ${g.target === 'new' ? 'selected' : ''}>A new account named…</option>
+            ${DB.accounts.map(a => `<option value="${a.id}" ${g.target === a.id ? 'selected' : ''}>Existing: ${esc(a.name)}</option>`).join('')}
+            <option value="skip" ${g.skip ? 'selected' : ''}>Don't import</option></select></label>
+          ${g.target === 'new' && !g.skip ? `<div class="grid2" style="gap:8px"><label style="margin:0">Name<input data-imp="${fi}:${gi}:newName" value="${esc(g.newName)}"></label>
+            <label style="margin:0">Kind<select data-imp="${fi}:${gi}:type">${ACCOUNT_TYPES.map(([k, l]) => `<option value="${k}" ${g.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>` : '<div></div>'}
+        </div></div>`).join('')}
+      <div class="grid2" style="border-top:1px solid var(--line);padding-top:12px">
+        <label style="margin:0">Dates in this file are written as<select data-imp="${fi}:-:dateOrder">
+          <option value="DMY" ${f.dateOrder === 'DMY' ? 'selected' : ''}>day-month-year</option>
+          <option value="MDY" ${f.dateOrder === 'MDY' ? 'selected' : ''}>month/day/year (American)</option>
+          <option value="YMD" ${f.dateOrder === 'YMD' ? 'selected' : ''}>year-month-day</option></select>
+          <span class="hint">${f.detectedOrder ? 'Detected automatically. ' : 'Could not be detected for certain — please check. '}First date “${esc(f.sample)}” will become <b>${ex ? esc(fmtDate(ex)) : 'invalid'}</b>.</span></label>
+        <label style="margin:0">Amounts use<select data-imp="${fi}:-:comma"><option value="1" ${f.comma ? 'selected' : ''}>a decimal comma (12,50)</option><option value="0" ${!f.comma ? 'selected' : ''}>a decimal point (12.50)</option></select></label>
+      </div>
+      ${f.invst ? `<p class="hint">${f.invst} investment transactions are in this file; Kasboek does not handle investments, so they will be skipped.</p>` : ''}
+      ${f.cats.length ? `<p class="hint">Includes ${f.cats.length} category definitions.</p>` : ''}
+      </div>`;
+    }).join('') + `<div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn" data-act="imp-cancel">Cancel</button><button class="btn primary" data-act="imp-run">Import now</button></div>`;
+  }
+  return `<div class="page">
+    <div class="head"><div class="grow"><h1>Import from Microsoft Money</h1><p class="sub">Money can export each account as a QIF file. Kasboek reads those files, recreates your accounts and categories, and pairs up transfers between accounts so nothing is counted twice.</p></div></div>
+    <div class="card">
+      <h2>1. Export from Money (on a Windows computer)</h2>
+      <ol class="steps">
+        <li>Open your Money file and choose <b>File → Export</b>.</li>
+        <li>If Money asks for a format, choose <b>Loose QIF</b>. (If the result will not import, try <b>Strict QIF</b>.)</li>
+        <li>Choose one account and save the file, for example <i>Current account.qif</i>.</li>
+        <li>Repeat for <b>every</b> account, including savings, cash and credit cards. Transfers between them are matched automatically.</li>
+        <li>Copy the files to this Mac (USB stick, e-mail to yourself, or iCloud Drive).</li>
+      </ol>
+      <details style="margin-top:10px"><summary>No Windows computer with Money any more?</summary>
+        <p class="sub">Money needs Windows to run. Options: use an old PC one last time, ask someone with Windows to do the export, or install Windows in a virtual machine on your Mac (for example Parallels Desktop or VMware Fusion) and install Money there. Your <i>.mny</i> file itself cannot be read directly by Kasboek.</p></details>
+      <h2 style="margin-top:20px">2. Choose the files</h2>
+      <p class="sub" style="margin-top:0">You can select several files at once. Importing the same file twice is safe: transactions already imported are skipped.</p>
+      <div class="row" style="margin-top:10px"><button class="btn primary" data-act="pick-qif">Choose QIF files…</button></div>
+    </div>
+    ${planHTML}
+  </div>`;
+}
+
+/* ---------- Example data ---------- */
+function makeSample() {
+  let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  const between = (a, b) => Math.round((a + rnd() * (b - a)) * 100);
+  const keep = DB.settings;
+  DB = emptyDB(); DB.settings = keep;
+  const A = (name, type, note) => { const a = { id: uid(), name, type, note: note || '', closed: false }; DB.accounts.push(a); return a.id; };
+  const chk = A('Current account', 'checking'), sav = A('Savings account', 'savings'), cc = A('Credit card', 'credit'), cash = A('Cash', 'cash');
+  const C = (p, k) => findOrCreateCategory(p, k).cat.id;
+  const cat = {
+    salary: C('Salary', 'income'), interest: C('Interest', 'income'), mort: C('Housing : Mortgage', 'expense'), energy: C('Utilities : Energy'), water: C('Utilities : Water'), net: C('Utilities : Internet & phone'),
+    groc: C('Food : Groceries'), dine: C('Food : Dining out'), fuel: C('Car : Fuel'), carins: C('Car : Insurance'), health: C('Insurance : Health'), home: C('Insurance : Home'), cloth: C('Clothing'),
+    gifts: C('Gifts'), hol: C('Holidays'), books: C('Leisure : Books & music'), cult: C('Leisure : Culture'), pharm: C('Health : Pharmacy'), tax: C('Taxes : Municipal'),
+  };
+  const now = todayISO().slice(0, 7);
+  const start = addMonths(now, -23);
+  const st = date => { const ago = monthsBetween(date.slice(0, 7), now).length - 1; return ago >= 2 ? 'R' : ago === 1 ? 'c' : ''; };
+  const T = (acc, date, amount, payee, catId, extra) => { if (date > todayISO()) return null; const t = newTx(Object.assign({ accountId: acc, date, amount, payee, categoryId: catId || null, status: st(date) }, extra || {})); if (t.transferAccountId || t.splits) syncLegs(t); return t; };
+  newTx({ accountId: chk, date: start + '-01', amount: 245000, payee: 'Opening balance', ob: true, status: 'R' });
+  newTx({ accountId: sav, date: start + '-01', amount: 1200000, payee: 'Opening balance', ob: true, status: 'R' });
+  newTx({ accountId: cash, date: start + '-01', amount: 6000, payee: 'Opening balance', ob: true, status: 'R' });
+  let ccOwed = 0;
+  for (const m of monthsBetween(start, now)) {
+    const [y, mo] = m.split('-').map(Number);
+    const d = n => isoOf(y, mo, n);
+    T(chk, d(1), -118000, 'Rabobank Hypotheken', cat.mort);
+    T(chk, d(3), -16500 - between(0, 30), 'Vattenfall', cat.energy);
+    T(chk, d(8), -5450, 'KPN', cat.net);
+    if (mo % 3 === 1) T(chk, d(9), -6200, 'Vitens', cat.water);
+    T(chk, d(12), -14290, 'Zilveren Kruis', cat.health);
+    T(chk, d(14), -2875, 'Centraal Beheer', null, { splits: [{ categoryId: cat.home, transferAccountId: null, memo: 'Home insurance', amount: -1850 }, { categoryId: cat.carins, transferAccountId: null, memo: 'Car insurance', amount: -1025 }] });
+    if (mo === 3) T(chk, d(28), -38600, 'Gemeente Nijmegen', cat.tax, { memo: 'Municipal taxes' });
+    for (let w = 0; w < 4; w++) T(chk, d(2 + w * 7), -between(48, 135), rnd() < .6 ? 'Albert Heijn' : 'Jumbo', cat.groc);
+    for (let k = 0; k < 2; k++) T(chk, d(5 + k * 12), -between(55, 85), 'Shell', cat.fuel);
+    if (rnd() < .5) T(chk, d(17), -between(8, 35), 'Kruidvat', cat.pharm);
+    T(chk, d(25), 345000, 'Radboud Universiteit', cat.salary, { memo: 'Salary' });
+    if (mo === 5) T(chk, d(25), 268000, 'Radboud Universiteit', cat.salary, { memo: 'Holiday allowance' });
+    T(chk, d(26), -40000, 'Monthly savings', null, { transferAccountId: sav });
+    T(chk, d(6), -10000, 'ATM withdrawal', null, { transferAccountId: cash });
+    for (let k = 0; k < 3; k++) T(cash, d(7 + k * 6), -between(6, 28), ['Bakker Bart', 'Market', 'Café De Plak'][k], k === 2 ? cat.dine : cat.groc);
+    if (ccOwed > 0) { T(chk, d(15), -ccOwed, 'Credit card payment', null, { transferAccountId: cc }); }
+    ccOwed = 0;
+    const buys = [['Bol.com', cat.books, 15, 60], ['Restaurant De Hemel', cat.dine, 45, 120], ['H&M', cat.cloth, 30, 110], ['Stadsschouwburg', cat.cult, 40, 90]];
+    for (const [p, c, lo, hi] of buys) { if (rnd() < .7) { const t = T(cc, d(4 + Math.floor(rnd() * 22)), -between(lo, hi), p, c); if (t) ccOwed += -t.amount; } }
+    if (mo === 7) { const t = T(cc, d(10), -164500, 'Booking.com', cat.hol, { memo: 'Summer holiday' }); if (t) ccOwed += 164500; }
+    if (mo === 12) { const t = T(cc, d(15), -between(150, 260), 'Gifts', cat.gifts); if (t) ccOwed += -t.amount; T(sav, d(31), between(90, 140), 'Interest', cat.interest); }
+  }
+  _idx = null; changed();
+}
+
+/* ---------- events ---------- */
+function afterRender() {
+  const fb = fileBanner(), pg = $('#main .page');
+  if (fb && pg) pg.insertAdjacentHTML('afterbegin', fb);
+  wireCharts($('#main'));
+  const s = $('#reg-search');
+  if (s) {
+    let tmr;
+    s.addEventListener('input', () => { clearTimeout(tmr); tmr = setTimeout(() => { regState.search = s.value; regState.shown = 300; const pos = s.selectionStart; render(); const n = $('#reg-search'); n.focus(); n.setSelectionRange(pos, pos); }, 250); });
+  }
+  const rp = $('#reg-period'); if (rp) rp.onchange = () => { regState.period = rp.value; regState.custom = regState.custom || {}; regState.shown = 300; render(); };
+  const rf = $('#reg-from'), rt = $('#reg-to');
+  if (rf) rf.onchange = () => { regState.custom.from = rf.value; render(); };
+  if (rt) rt.onchange = () => { regState.custom.to = rt.value; render(); };
+  const pp = $('#rp-period'); if (pp) pp.onchange = () => { reportState.period = pp.value; render(); };
+  const pf = $('#rp-from'), pt = $('#rp-to');
+  if (pf) pf.onchange = () => { reportState.custom.from = pf.value; render(); };
+  if (pt) pt.onchange = () => { reportState.custom.to = pt.value; render(); };
+  const pa = $('#rp-acc'); if (pa) pa.onchange = () => { reportState.account = pa.value; render(); };
+  const pc = $('#rp-cat'); if (pc) pc.onchange = () => { reportState.catSel = pc.value ? pc.value.slice(2) : ''; render(); };
+  const sc = $('#set-cur'); if (sc) sc.onchange = () => { DB.settings.currency = sc.value; resetFormats(); changed(); render(); };
+  const sl = $('#set-loc'); if (sl) sl.onchange = () => { DB.settings.locale = sl.value; resetFormats(); changed(); render(); };
+  const sth = $('#set-theme'); if (sth) sth.onchange = () => { DB.settings.theme = sth.value; applyTheme(); changed(); };
+  $$('[data-imp]').forEach(el => el.addEventListener('change', () => {
+    const [fi, gi, key] = el.dataset.imp.split(':');
+    const f = importPlan.files[+fi];
+    if (gi === '-') { f[key] = key === 'comma' ? el.value === '1' : el.value; render(); return; }
+    const g = f.accounts[+gi];
+    if (key === 'target') { g.skip = el.value === 'skip'; g.target = g.skip ? 'new' : el.value; render(); }
+    else g[key] = el.value;
+  }));
+}
+
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-go],[data-acc],[data-act],[data-tx],[data-status],[data-recon],[data-rtype],[data-drill],[data-rdrill],[data-cat-sub],[data-cat-ren],[data-cat-kind],[data-cat-del]');
+  if (!el || el.closest('.modal')) return;
+  const d = el.dataset;
+  if (d.go) return go(d.go);
+  if (d.status) {
+    e.stopPropagation();
+    const t = idx().tx.get(d.status); if (!t || t.status === 'R') return;
+    t.status = t.status === 'c' ? '' : 'c'; changed(); render(); return;
+  }
+  if (d.recon) {
+    if (e.target.tagName !== 'INPUT') return;
+    if (e.target.checked) recon.checked.add(d.recon); else recon.checked.delete(d.recon);
+    render(); return;
+  }
+  if (d.tx) {
+    const t = idx().tx.get(d.tx);
+    if (recon) { if (t) { recon.checked.has(t.id) ? recon.checked.delete(t.id) : recon.checked.add(t.id); render(); } return; }
+    if (t) openTxEditor(t); return;
+  }
+  if (d.acc) return go('account', { accountId: d.acc });
+  if (d.rtype) { reportState.type = d.rtype; reportState.drill = reportState.drill2 = null; return render(); }
+  if (d.drill != null && el.classList.contains('drill')) {
+    if (state.view !== 'reports') return;
+    const I = idx(), k = d.drill;
+    const hasSubs = k !== '_in' && k !== '_out' && (I.childrenOf.get(k) || []).length > 0;
+    if (!reportState.drill && hasSubs) reportState.drill = k; else reportState.drill2 = k;
+    return render();
+  }
+  if (d.rdrill != null) { reportState.drill = d.rdrill || null; reportState.drill2 = null; return render(); }
+  if (d.catSub) { const p = idx().cat.get(d.catSub); const n = await promptBox('New subcategory of ' + p.name, 'Name', ''); if (n) { findOrCreateCategory(p.name + ':' + n.replace(/:/g, ' '), p.kind); changed(); render(); } return; }
+  if (d.catRen) {
+    const c = idx().cat.get(d.catRen); const n = await promptBox('Rename category', 'New name', c.name);
+    if (n) { const clash = DB.categories.find(x => x !== c && x.parentId === c.parentId && x.name.toLowerCase() === n.toLowerCase()); if (clash) return alertBox('Name already used', 'Another category already has this name. To merge them, delete one and move its transactions to the other.'); c.name = n.replace(/:/g, ' '); changed(); render(); } return;
+  }
+  if (d.catKind) { const c = idx().cat.get(d.catKind); c.kind = c.kind === 'expense' ? 'income' : 'expense'; for (const s of (idx().childrenOf.get(c.id) || [])) s.kind = c.kind; changed(); render(); return; }
+  if (d.catDel) return deleteCategory(d.catDel);
+  switch (d.act) {
+    case 'add-account': return openAccountEditor(null);
+    case 'edit-account': return openAccountEditor(idx().acc.get(state.accountId));
+    case 'new-tx': return openTxEditor(null, state.accountId);
+    case 'new-tx-any': {
+      const accs = DB.accounts.filter(a => !a.closed);
+      if (accs.length === 1) return openTxEditor(null, accs[0].id);
+      const w = openModal({ title: 'Which account?', body: `<div class="cards" style="gap:6px">${accs.map(a => `<button class="bigbtn" data-pick="${a.id}" style="padding:10px 14px"><b style="margin:0">${esc(a.name)}</b></button>`).join('')}</div>` });
+      $$('[data-pick]', w).forEach(b => b.onclick = () => { closeModal(w); openTxEditor(null, b.dataset.pick); });
+      return;
+    }
+    case 'show-more': regState.shown += 500; return render();
+    case 'reg-csv': return exportRegisterCSV();
+    case 'report-csv': if (reportState._csv) downloadCSV('Kasboek report ' + todayISO() + '.csv', reportState._csv); return;
+    case 'print': return window.print();
+    case 'recon-start': return startReconcile();
+    case 'recon-finish': return finishReconcile('finish');
+    case 'recon-postpone': return finishReconcile('postpone');
+    case 'recon-cancel': recon = null; return render();
+    case 'recon-adjust': {
+      const all = idx().byAcc.get(recon.accountId) || [];
+      const cleared = all.filter(t => t.status === 'R').reduce((s, t) => s + t.amount, 0) + all.filter(t => recon.checked.has(t.id)).reduce((s, t) => s + t.amount, 0);
+      const diff = recon.ending - cleared;
+      if (!await confirmBox('Finish with an adjustment?', `<p>Kasboek and your statement differ by <b>${esc(money(diff))}</b>. Kasboek can add a “Balance adjustment” transaction of that amount so the account matches the statement.</p><p>It is usually better to look for the missing or mistyped transaction first.</p>`, 'Add adjustment and finish')) return;
+      const t = newTx({ accountId: recon.accountId, date: recon.date, amount: diff, payee: 'Balance adjustment', memo: 'Added when reconciling', status: '' });
+      recon.checked.add(t.id); _idx = null;
+      return finishReconcile('finish');
+    }
+    case 'install': return installApp();
+    case 'fs-create': return createSharedFile();
+    case 'fs-open': return openSharedFile();
+    case 'fs-reconnect': return reconnectFile();
+    case 'fs-sync': if (fileStatus === 'error') fileStatus = 'ok'; await syncFile(); return render();
+    case 'fs-stop': return stopSharedFile();
+    case 'fs-merge': return mergeOtherFile();
+    case 'save-backup': return saveBackup();
+    case 'open-backup': return openBackup();
+    case 'sample': makeSample(); return go('home');
+    case 'pick-qif': $('#file-qif').value = ''; return $('#file-qif').click();
+    case 'imp-cancel': importPlan = null; return render();
+    case 'imp-run': {
+      const st = runImport(importPlan); importPlan = null;
+      go('home');
+      alertBox('Import finished', `<p><b>${st.tx.toLocaleString()}</b> transactions imported${st.matched ? `, <b>${st.matched.toLocaleString()}</b> transfers matched with the other account` : ''}.</p>
+        ${st.newAccounts.length ? `<p>New accounts: ${st.newAccounts.map(esc).join(', ')}.</p>` : ''}
+        ${st.autoAccounts.length ? `<p>These accounts were only mentioned in transfers, so they were created with just those transfers: <b>${st.autoAccounts.map(esc).join(', ')}</b>. Import their own QIF files too to complete them.</p>` : ''}
+        ${st.cats ? `<p>${st.cats} categories created.</p>` : ''}
+        ${st.dupes ? `<p>${st.dupes.toLocaleString()} transactions were already in Kasboek and were skipped.</p>` : ''}
+        ${st.badDates ? `<p class="neg">${st.badDates} transactions had an unreadable date and were skipped.</p>` : ''}
+        ${st.invst ? `<p class="muted">${st.invst} investment transactions were skipped.</p>` : ''}
+        <p>Tip: check each account's balance against Money or your bank, then save a backup file.</p>`);
+      return;
+    }
+    case 'cat-add': {
+      const n = await promptBox('New category', 'Category name', '', 'Use “Food : Groceries” for a subcategory');
+      if (!n) return;
+      const isInc = await confirmBox('Income or expense?', `<p>Is “${esc(n)}” a category for <b>income</b>? Choose Cancel for an expense category.</p>`, 'Income');
+      findOrCreateCategory(n, isInc ? 'income' : 'expense'); changed(); return render();
+    }
+    case 'erase': {
+      if (!await confirmBox('Erase all data?', fileHandle && fileStatus === 'ok' ? '<p><b>You are using a shared data file.</b> This removes every account, category and transaction from that file, so also from the other computer. Backup files you saved are not affected.</p>' : '<p>This removes every account, category and transaction from Kasboek on this computer. Backup files you saved are not affected.</p>', 'Erase everything', true)) return;
+      const keep = DB.settings; DB = emptyDB(); DB.settings = keep; changed(); return go('home');
+    }
+  }
+});
+$('#file-qif').addEventListener('change', async e => {
+  const files = Array.from(e.target.files || []); if (!files.length) return;
+  try { importPlan = await readQifFiles(files); } catch (err) { importPlan = null; alertBox('Could not read the file', esc(err.message)); }
+  if (importPlan && !importPlan.files.some(f => f.accounts.length)) { alertBox('Nothing to import', 'No bank, cash or credit-card transactions were found. Are these QIF files exported from Money?'); importPlan = null; }
+  render();
+});
+
+/* ---------- start ---------- */
+(async function start() {
+  const d = await loadData();
+  if (d) { DB = Object.assign(emptyDB(), d); DB.settings = Object.assign(emptyDB().settings, d.settings || {}); }
+  applyTheme();
+  if (fileHandle) {
+    try { fileStatus = (await fileHandle.queryPermission({ mode: 'readwrite' })) === 'granted' ? 'ok' : 'needs-permission'; }
+    catch (e) { fileStatus = 'needs-permission'; }
+  }
+  render();
+  if (fileHandle && fileStatus === 'ok') syncFile();
+  setInterval(checkForOtherComputer, 15000);
+  window.addEventListener('focus', checkForOtherComputer);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForOtherComputer(); });
+})();
+</script>
+</body>
+</html>
