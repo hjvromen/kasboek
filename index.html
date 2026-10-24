@@ -228,7 +228,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.6 (oktober 2026)';
+const APP_VERSION = '1.7 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -782,7 +782,7 @@ let state = { view: 'home' };
 const regState = { search: '', period: 'all', shown: 300 };
 let recon = null;
 let lastEnteredDate = null;
-let reportState = { type: 'spending', period: 'thisYear', custom: {}, account: 'all', drill: null, drill2: null, catSel: '', year: +todayISO().slice(0, 4), subs: true, cents: false };
+let reportState = { type: 'spending', period: 'thisYear', custom: {}, account: 'all', drill: null, drill2: null, catSel: '', year: +todayISO().slice(0, 4), subs: true, cents: false, yFrom: null, yTo: null };
 
 function go(view, extra) { state = Object.assign({ view }, extra || {}); if (view !== 'account') recon = null; regState.shown = 300; render(); $('#main').scrollTop = 0; }
 
@@ -1461,6 +1461,7 @@ const REPORTS = [
   ['spending', 'Uitgaven per categorie'],
   ['income', 'Inkomsten per categorie'],
   ['year', 'Jaaroverzicht'],
+  ['years', 'Meerjarenoverzicht'],
   ['incexp', 'Inkomsten en uitgaven'],
   ['trend', 'Categorie door de tijd'],
   ['networth', 'Vermogen door de tijd'],
@@ -1487,22 +1488,31 @@ function spendingRows(flows, drill, kind) {
 }
 /* ---------- Jaaroverzicht: categories × months for one year ---------- */
 const MONTHS_SHORT = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
-function yearFlows(year, accountId) {
+/* amounts per category, split over n columns; colOf(date) gives the column or -1 */
+function gridFlows(accountId, n, colOf) {
   const m = new Map();
-  const add = (k, mi, v) => { if (!m.has(k)) m.set(k, new Array(12).fill(0)); m.get(k)[mi] += v; };
-  const y = String(year);
+  const add = (k, mi, v) => { if (!m.has(k)) m.set(k, new Array(n).fill(0)); m.get(k)[mi] += v; };
   for (const t of DB.transactions) {
-    if (t.linkId || t.ob || t.date.slice(0, 4) !== y) continue;
+    if (t.linkId || t.ob) continue;
     if (accountId !== 'all' && t.accountId !== accountId) continue;
-    const mi = +t.date.slice(5, 7) - 1;
+    const mi = colOf(t.date);
+    if (mi < 0) continue;
     if (t.splits && t.splits.length) { for (const s of t.splits) if (!s.transferAccountId) add(s.categoryId || (s.amount > 0 ? '_in' : '_out'), mi, s.amount); }
     else if (!t.transferAccountId) add(t.categoryId || (t.amount > 0 ? '_in' : '_out'), mi, t.amount);
   }
   return m;
 }
 function yearRows(year, accountId, showSubs) {
-  const I = idx(), fl = yearFlows(year, accountId);
-  const zero = () => new Array(12).fill(0);
+  const y = String(year);
+  return gridRows(gridFlows(accountId, 12, d => d.slice(0, 4) === y ? +d.slice(5, 7) - 1 : -1), 12, showSubs);
+}
+function multiYearRows(years, accountId, showSubs) {
+  const first = years[0];
+  return gridRows(gridFlows(accountId, years.length, d => { const i = +d.slice(0, 4) - first; return i >= 0 && i < years.length ? i : -1; }), years.length, showSubs);
+}
+function gridRows(fl, n, showSubs) {
+  const I = idx();
+  const zero = () => new Array(n).fill(0);
   const sum = (a, b) => a.map((v, i) => v + b[i]);
   const nz = a => a.some(v => v);
   const out = { income: [], expense: [], totals: {} };
@@ -1535,6 +1545,13 @@ function yearsWithData() {
   for (const t of DB.transactions) ys.add(+t.date.slice(0, 4));
   return Array.from(ys).sort((a, b) => b - a);
 }
+function yearSpan() {
+  const ys = yearsWithData(), lo = ys[ys.length - 1], hi = ys[0];
+  let a = reportState.yFrom, b = reportState.yTo;
+  if (b == null || b > hi || b < lo) b = hi;
+  if (a == null || a < lo || a > b) a = Math.max(lo, b - 9);
+  return [a, b];
+}
 function txForCategories(from, to, accountId, ids) {
   const set = new Set(ids), out = [];
   for (const t of DB.transactions) {
@@ -1545,11 +1562,9 @@ function txForCategories(from, to, accountId, ids) {
   }
   return out.sort((a, b) => cmpTx(a.t, b.t));
 }
-function showYearCell(label, ids, year, mi) {
-  const from = mi == null ? year + '-01-01' : isoOf(year, mi + 1, 1), to = mi == null ? year + '-12-31' : isoOf(year, mi + 1, 31);
+function showGridCell(label, ids, from, to, when) {
   const list = txForCategories(from, to, reportState.account, ids);
   const total = list.reduce((s, x) => s + x.amount, 0);
-  const when = mi == null ? String(year) : fmtMonth(year + '-' + pad(mi + 1));
   const w = openModal({ wide: true, title: esc(label) + ' — ' + esc(when), body: list.length ? `<table class="t"><thead><tr><th>Datum</th><th>Rekening</th><th>Begunstigde</th><th>Notitie</th><th class="num">Bedrag</th></tr></thead><tbody>
     ${list.map(x => `<tr class="click" data-goacc="${x.t.accountId}"><td>${fmtDate(x.t.date)}</td><td>${esc(accName(x.t.accountId))}</td><td>${esc(x.t.payee)}</td><td class="muted">${esc(x.memo)}</td><td class="num">${moneyHTML(x.amount)}</td></tr>`).join('')}
     </tbody><tfoot><tr><td colspan="4">Totaal (${list.length} transacties)</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>` : '<p class="muted">Geen transacties.</p>' });
@@ -1606,28 +1621,40 @@ function viewReports() {
         : `<p class="muted">Niets geboekt in deze periode.</p>`}`;
       csv = [['Categorie', 'Bedrag']].concat(rows.map(r => [r.label, moneyPlain(r.value)]));
     }
-  } else if (rs.type === 'year') {
-    const Y = rs.year, R = yearRows(Y, rs.account, rs.subs);
-    reportState._yearRows = R;
+  } else if (rs.type === 'year' || rs.type === 'years') {
+    let R, cols, ranges, total, avgLabel, avgCsv, emptyIn;
+    if (rs.type === 'year') {
+      const Y = rs.year;
+      R = yearRows(Y, rs.account, rs.subs); cols = MONTHS_SHORT;
+      ranges = MONTHS_SHORT.map((m, i) => [isoOf(Y, i + 1, 1), isoOf(Y, i + 1, 31), fmtMonth(Y + '-' + pad(i + 1))]);
+      total = [Y + '-01-01', Y + '-12-31', String(Y)]; avgLabel = 'Gem./mnd'; avgCsv = 'Gemiddeld per maand'; emptyIn = 'in ' + Y;
+    } else {
+      const [a, b] = yearSpan(); const years = []; for (let y = a; y <= b; y++) years.push(y);
+      R = multiYearRows(years, rs.account, rs.subs); cols = years.map(String);
+      ranges = years.map(y => [y + '-01-01', y + '-12-31', String(y)]);
+      total = [a + '-01-01', b + '-12-31', a + '–' + b]; avgLabel = 'Gem./jaar'; avgCsv = 'Gemiddeld per jaar'; emptyIn = 'in ' + a + '–' + b;
+    }
+    const N = cols.length;
+    reportState._grid = { R, ranges, total };
     const nf = new Intl.NumberFormat(DB.settings.locale, { minimumFractionDigits: rs.cents ? 2 : 0, maximumFractionDigits: rs.cents ? 2 : 0 });
     const num = v => `<span class="${v < 0 ? 'neg' : ''}">${esc(nf.format(v / 100))}</span>`;
     const cell = v => v ? num(v) : '<span class="muted">–</span>';
-    const avg = v => Math.round(v.reduce((a, b) => a + b, 0) / 12);
+    const avg = v => Math.round(v.reduce((a, b) => a + b, 0) / N);
     const totalOf = v => v.reduce((a, b) => a + b, 0);
     const line = (r, key, idx2) => `<tr class="${r.group ? 'grp' : ''}"><td class="lbl" style="padding-left:${10 + r.level * 18}px">${esc(r.label)}</td>${r.v.map((v, i) => `<td class="num ${v ? 'yc' : ''}" ${v ? `data-yc="${key}:${idx2}:${i}"` : ''}>${cell(v)}</td>`).join('')}<td class="num tot yc" data-yc="${key}:${idx2}:-">${cell(totalOf(r.v))}</td><td class="num muted">${cell(avg(r.v))}</td></tr>`;
     const totLine = (label, v, cls) => `<tr class="${cls}"><td class="lbl">${label}</td>${v.map(x => `<td class="num">${num(x)}</td>`).join('')}<td class="num tot">${num(totalOf(v))}</td><td class="num">${num(avg(v))}</td></tr>`;
-    const head = `<tr><th class="lbl"></th>${MONTHS_SHORT.map(m => `<th class="num">${m}</th>`).join('')}<th class="num">Totaal</th><th class="num">Gem./mnd</th></tr>`;
-    const sect = (title, kind) => `<tr class="sect"><td colspan="15">${title}</td></tr>` + (R[kind].length ? R[kind].map((r, i) => line(r, kind, i)).join('') : `<tr><td class="lbl muted" colspan="15">Geen ${title.toLowerCase()} in ${Y}.</td></tr>`) + totLine('Totaal ' + title.toLowerCase(), R.totals[kind], 'sub');
+    const head = `<tr><th class="lbl"></th>${cols.map(m => `<th class="num">${m}</th>`).join('')}<th class="num">Totaal</th><th class="num">${avgLabel}</th></tr>`;
+    const sect = (title, kind) => `<tr class="sect"><td colspan="${N + 3}">${title}</td></tr>` + (R[kind].length ? R[kind].map((r, i) => line(r, kind, i)).join('') : `<tr><td class="lbl muted" colspan="${N + 3}">Geen ${title.toLowerCase()} ${emptyIn}.</td></tr>`) + totLine('Totaal ' + title.toLowerCase(), R.totals[kind], 'sub');
     content = `<style>@media print{@page{size:A4 landscape;margin:12mm}}</style>
       <div class="ywrap"><table class="t yt"><thead>${head}</thead><tbody>
       ${sect('Inkomsten', 'income')}
       ${sect('Uitgaven', 'expense')}
-      <tr class="sect"><td colspan="15"></td></tr>
+      <tr class="sect"><td colspan="${N + 3}"></td></tr>
       ${totLine('Inkomsten min uitgaven', R.totals.net, 'net')}
       </tbody></table></div>
-      <p class="hint" style="margin-top:10px">Bedragen in ${esc(DB.settings.currency === 'EUR' ? 'euro' : DB.settings.currency)}${rs.cents ? '' : ', afgerond op hele bedragen (de export naar spreadsheet bevat de centen)'}. <span class="no-print">Klik op een bedrag om de transacties te zien.</span> Overboekingen tussen uw eigen rekeningen tellen niet mee.</p>`;
+      <p class="hint" style="margin-top:10px">Bedragen in ${esc(DB.settings.currency === 'EUR' ? 'euro' : DB.settings.currency)}${rs.cents ? '' : ', afgerond op hele bedragen (de export naar spreadsheet bevat de centen)'}. <span class="no-print">Klik op een bedrag om de transacties te zien.</span> Overboekingen tussen uw eigen rekeningen tellen niet mee.${rs.type === 'years' && yearSpan()[1] === +todayISO().slice(0, 4) ? ` Het jaar ${todayISO().slice(0, 4)} is nog niet voorbij.` : ''}</p>`;
     const csvLine = r => [(r.level ? '   ' : '') + r.label, ...r.v.map(moneyPlain), moneyPlain(totalOf(r.v)), moneyPlain(avg(r.v))];
-    csv = [['', ...MONTHS_SHORT, 'Totaal', 'Gemiddeld per maand'], ['Inkomsten'], ...R.income.map(csvLine), ['Totaal inkomsten', ...R.totals.income.map(moneyPlain), moneyPlain(totalOf(R.totals.income)), moneyPlain(avg(R.totals.income))],
+    csv = [['', ...cols, 'Totaal', avgCsv], ['Inkomsten'], ...R.income.map(csvLine), ['Totaal inkomsten', ...R.totals.income.map(moneyPlain), moneyPlain(totalOf(R.totals.income)), moneyPlain(avg(R.totals.income))],
       ['Uitgaven'], ...R.expense.map(csvLine), ['Totaal uitgaven', ...R.totals.expense.map(moneyPlain), moneyPlain(totalOf(R.totals.expense)), moneyPlain(avg(R.totals.expense))],
       ['Inkomsten min uitgaven', ...R.totals.net.map(moneyPlain), moneyPlain(totalOf(R.totals.net)), moneyPlain(avg(R.totals.net))]];
   } else if (rs.type === 'incexp') {
@@ -1687,14 +1714,15 @@ function viewReports() {
   }
   reportState._csv = csv;
   const showAcc = rs.type !== 'balances';
-  return `<div class="page ${rs.type === 'year' ? 'wide' : ''}">
+  return `<div class="page ${rs.type === 'year' || rs.type === 'years' ? 'wide' : ''}">
     <div class="head"><div class="grow"><h1>Rapporten</h1></div></div>
     <div class="tabs">${REPORTS.map(([k, l]) => `<button data-rtype="${k}" class="${rs.type === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <div class="toolbar">${rs.type === 'year' ? `<select id="rp-year">${yearsWithData().map(y => `<option ${y === rs.year ? 'selected' : ''}>${y}</option>`).join('')}</select>
+    <div class="toolbar">${rs.type === 'year' || rs.type === 'years' ? `${rs.type === 'year' ? `<select id="rp-year">${yearsWithData().map(y => `<option ${y === rs.year ? 'selected' : ''}>${y}</option>`).join('')}</select>`
+        : (() => { const [a, b] = yearSpan(), ys = yearsWithData().slice().reverse(); return `<label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400">Van <select id="rp-yfrom" style="width:auto">${ys.map(y => `<option ${y === a ? 'selected' : ''}>${y}</option>`).join('')}</select></label><label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400">t/m <select id="rp-yto" style="width:auto">${ys.map(y => `<option ${y === b ? 'selected' : ''}>${y}</option>`).join('')}</select></label>`; })()}
       <label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="rp-subs" ${rs.subs ? 'checked' : ''} style="width:auto;min-height:0"> Subcategorieën tonen</label>
       <label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="rp-cents" ${rs.cents ? 'checked' : ''} style="width:auto;min-height:0"> Centen tonen</label>` : periodSel} ${showAcc ? accSel : ''}<span class="grow"></span>
       ${csv ? '<button class="btn small" data-act="report-csv">Exporteren naar spreadsheet</button>' : ''}<button class="btn small" data-act="print">Afdrukken</button></div>
-    <div class="card"><h2>${esc(title)} <span class="hint">· ${rs.type === 'year' ? rs.year : esc(periodLabel(rs.period, rs.custom))}${showAcc ? ' · ' + esc(accLabel) : ''}</span></h2>${content}</div>
+    <div class="card"><h2>${esc(title)} <span class="hint">· ${rs.type === 'year' ? rs.year : rs.type === 'years' ? yearSpan().join('–') : esc(periodLabel(rs.period, rs.custom))}${showAcc ? ' · ' + esc(accLabel) : ''}</span></h2>${content}</div>
   </div>`;
 }
 
@@ -2136,9 +2164,13 @@ function afterRender() {
   const py = $('#rp-year'); if (py) py.onchange = () => { reportState.year = +py.value; render(); };
   const ps = $('#rp-subs'); if (ps) ps.onchange = () => { reportState.subs = ps.checked; render(); };
   const pcn = $('#rp-cents'); if (pcn) pcn.onchange = () => { reportState.cents = pcn.checked; render(); };
+  const pyf = $('#rp-yfrom'), pyt = $('#rp-yto');
+  if (pyf) pyf.onchange = () => { reportState.yFrom = +pyf.value; if (reportState.yTo != null && reportState.yTo < reportState.yFrom) reportState.yTo = reportState.yFrom; else if (reportState.yTo == null) reportState.yTo = yearSpan()[1]; render(); };
+  if (pyt) pyt.onchange = () => { reportState.yTo = +pyt.value; if (reportState.yFrom == null) reportState.yFrom = yearSpan()[0]; if (reportState.yFrom > reportState.yTo) reportState.yFrom = reportState.yTo; render(); };
   $$('[data-yc]').forEach(td => td.onclick = () => {
-    const [kind, i, m] = td.dataset.yc.split(':'), r = reportState._yearRows[kind][+i];
-    showYearCell(r.label, r.ids, reportState.year, m === '-' ? null : +m);
+    const [kind, i, m] = td.dataset.yc.split(':'), g = reportState._grid, r = g.R[kind][+i];
+    const [from, to, when] = m === '-' ? g.total : g.ranges[+m];
+    showGridCell(r.label, r.ids, from, to, when);
   });
   const pc = $('#rp-cat'); if (pc) pc.onchange = () => { reportState.catSel = pc.value ? pc.value.slice(2) : ''; render(); };
   const sc = $('#set-cur'); if (sc) sc.onchange = () => { DB.settings.currency = sc.value; resetFormats(); changed(); render(); };
