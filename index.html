@@ -212,10 +212,30 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.4 (oktober 2026)';
+const APP_VERSION = '1.5 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
+let swReg = null, updateReady = null;
+const hadController = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+/* Look on the web address for a newer Kasboek and offer it. */
+let lastUpdateCheck = 0;
+async function checkForUpdate() {
+  if (!IS_WEB || !navigator.onLine || Date.now() - lastUpdateCheck < 5 * 60000) return;
+  lastUpdateCheck = Date.now();
+  try {
+    if (swReg) swReg.update().catch(() => {});
+    const r = await fetch('index.html?check=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const m = (await r.text()).match(/const APP_VERSION = '([^']+)'/);
+    if (m && m[1] !== APP_VERSION && m[1] !== updateReady) { updateReady = m[1]; if (typeof render === 'function') render(); }
+  } catch (e) {}
+}
+async function applyUpdate() {
+  try { if ('caches' in window) for (const k of await caches.keys()) await caches.delete(k); } catch (e) {}
+  try { if (swReg) await swReg.update(); } catch (e) {}
+  location.reload();
+}
 let installPrompt = null;
 const isInstalledApp = () => window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: window-controls-overlay)').matches);
 if (IS_WEB) {
@@ -223,7 +243,12 @@ if (IS_WEB) {
     const l = document.createElement('link'); l.rel = rel; l.href = href; document.head.appendChild(l);
   }
   const tc = document.createElement('meta'); tc.name = 'theme-color'; tc.content = '#2a78d6'; document.head.appendChild(tc);
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => { swReg = r; r.update().catch(() => {}); }).catch(() => {});
+    // when a new version of the offline helper takes over, load the new program once
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded && hadController && !modalStack.length) { reloaded = true; location.reload(); } });
+  }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; if (typeof render === 'function' && state && (state.view === 'settings' || state.view === 'home')) render(); });
   window.addEventListener('appinstalled', () => { installPrompt = null; toast('Kasboek is geïnstalleerd. Open het voortaan vanuit het Dock of het Startmenu.'); render(); });
@@ -591,11 +616,15 @@ async function mergeOtherFile() {
   DB = mergeDB(DB, other); repairLinks(); changed(); render();
   alertBox('Bestanden samengevoegd', `<p>Er zijn ${(DB.transactions.length - n0).toLocaleString('nl-NL')} transacties toegevoegd uit <b>${esc(h.name)}</b>. Wijzigingen in bestaande transacties zijn samengevoegd; van elke transactie is de nieuwste versie bewaard.</p>`);
 }
+function updateBanner() {
+  if (!updateReady) return '';
+  return `<div class="banner"><span class="grow"><b>Er is een nieuwe versie van Kasboek: versie ${esc(updateReady)}.</b> Uw gegevens blijven gewoon bewaard.</span><button class="btn small primary" data-act="do-update">Nu bijwerken</button></div>`;
+}
 function fileBanner() {
-  if (!fileHandle) return '';
+  if (!fileHandle) return updateBanner();
   if (fileStatus === 'needs-permission') return `<div class="banner"><span class="grow"><b>Open het gedeelde gegevensbestand om verder te gaan.</b> Voor uw privacy vraagt de browser dit één keer bij elke start van Kasboek. Bestand: ${esc(fileHandle.name)}</span><button class="btn small primary" data-act="fs-reconnect">Gedeeld bestand openen</button></div>`;
   if (fileStatus === 'error') return `<div class="banner"><span class="grow"><b>Het gedeelde gegevensbestand is niet bereikbaar.</b> ${esc(fileError)} Uw wijzigingen blijven op deze computer bewaard en worden aan het bestand toegevoegd zodra het weer bereikbaar is.</span><button class="btn small" data-act="fs-sync">Opnieuw proberen</button><button class="btn small" data-act="fs-open">Bestand opnieuw kiezen…</button></div>`;
-  return '';
+  return updateBanner();
 }
 window.addEventListener('beforeunload', e => { if (saveState === 'saving') { saveNow(); } });
 function updateSaveStatus() {
@@ -2071,6 +2100,7 @@ document.addEventListener('click', async e => {
       return finishReconcile('finish');
     }
     case 'install': return installApp();
+    case 'do-update': return applyUpdate();
     case 'fs-create': return createSharedFile();
     case 'fs-open': return openSharedFile();
     case 'fs-reconnect': return reconnectFile();
@@ -2126,6 +2156,8 @@ $('#file-qif').addEventListener('change', async e => {
   render();
   if (fileHandle && fileStatus === 'ok') syncFile();
   setInterval(checkForOtherComputer, 15000);
+  checkForUpdate(); setInterval(checkForUpdate, 30 * 60000);
+  window.addEventListener('focus', checkForUpdate);
   window.addEventListener('focus', checkForOtherComputer);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForOtherComputer(); });
 })();
