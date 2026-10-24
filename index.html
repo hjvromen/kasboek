@@ -147,6 +147,9 @@ label>input,label>select,label>.row{margin-top:4px}
 .yt td.yc{cursor:pointer}
 .yt td.yc:hover{background:var(--hover)}
 @media print{.ywrap{overflow:visible}.yt{min-width:0;font-size:8.5pt}.yt th,.yt td{padding:3px 4px}.no-print{display:none}}
+.csvh{font-size:14px;font-weight:650;margin:16px 0 8px}
+.csvmap td{vertical-align:middle}
+summary{cursor:pointer}
 .splitsum{font-size:14px;color:var(--ink-2);display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 .hbars{display:flex;flex-direction:column;gap:2px}
 .hbar{display:grid;grid-template-columns:minmax(90px,200px) minmax(40px,1fr) auto 40px;gap:12px;align-items:center;border:0;background:none;padding:6px 6px;border-radius:7px;text-align:left;cursor:default;width:100%}
@@ -220,6 +223,7 @@ details summary{cursor:pointer;color:var(--accent)}
 <datalist id="payee-list"></datalist>
 <input type="file" id="file-backup" accept=".json,application/json" hidden>
 <input type="file" id="file-qif" accept=".qif,.QIF,text/plain" multiple hidden>
+<input type="file" id="file-csv" accept=".csv,.CSV,.txt,.TXT,.tab,.TAB,text/csv,text/plain" multiple hidden>
 
 <script>
 "use strict";
@@ -228,7 +232,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.7 (oktober 2026)';
+const APP_VERSION = '1.8 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -830,7 +834,7 @@ function renderSide() {
   <h3>Extra</h3>
   <button class="nav${on('reports')}" data-go="reports">${ICONS.reports}<span class="nm">Rapporten</span></button>
   <button class="nav${on('categories')}" data-go="categories">${ICONS.cats}<span class="nm">Categorieën</span></button>
-  <button class="nav${on('import')}" data-go="import">${ICONS.import}<span class="nm">Importeren uit Money</span></button>
+  <button class="nav${on('import')}" data-go="import">${ICONS.import}<span class="nm">Importeren</span></button>
   <button class="nav${on('settings')}" data-go="settings">${ICONS.settings}<span class="nm">Instellingen &amp; reservekopie</span></button>
   <div class="foot"><span id="savestatus" class="status-saved"></span></div>`;
   $('#side').innerHTML = h;
@@ -1290,7 +1294,8 @@ function openAccountEditor(acc) {
     <label>Soort rekening<select name="type">${ACCOUNT_TYPES.map(([k, l]) => `<option value="${k}" ${a.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     ${isNew ? `<div class="grid2"><label>Saldo nu <span class="hint" id="obhint">wat er nu op de rekening staat</span><input name="ob" inputmode="decimal" placeholder="0${localeDecimal()}00"></label>
       <label>Op datum<input type="date" name="obdate" value="${todayISO()}"></label></div>` : ''}
-    <label>Opmerking <span class="hint">optioneel (rekeningnummer, bank, …)</span><input name="note" value="${esc(a.note || '')}"></label>
+    <label>IBAN <span class="hint">optioneel; nodig om overboekingen tussen uw rekeningen bij het importeren te herkennen</span><input name="iban" value="${esc(a.iban || '')}" placeholder="NL00 BANK 0123 4567 89" autocomplete="off"></label>
+    <label>Opmerking <span class="hint">optioneel</span><input name="note" value="${esc(a.note || '')}"></label>
     ${!isNew ? `<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="closed" ${a.closed ? 'checked' : ''} style="width:auto;min-height:0"> Deze rekening is opgeheven (niet meer in de lijst tonen)</label>` : ''}
     <div class="err"></div>
     <div class="modal-actions">${!isNew ? '<button type="button" class="btn danger" data-del>Rekening verwijderen</button>' : ''}<span class="spacer"></span><button type="button" class="btn" data-close>Annuleren</button><button class="btn primary">${isNew ? 'Rekening toevoegen' : 'Opslaan'}</button></div>
@@ -1305,14 +1310,14 @@ function openAccountEditor(acc) {
     if (!name) { $('.err', w).textContent = 'Vul een naam in.'; return; }
     if (DB.accounts.some(x => x !== acc && x.name.toLowerCase() === name.toLowerCase())) { $('.err', w).textContent = 'Er is al een rekening met deze naam.'; return; }
     if (isNew) {
-      const na = { id: uid(), name, type: f.type.value, note: f.note.value.trim(), closed: false };
+      const na = { id: uid(), name, type: f.type.value, note: f.note.value.trim(), iban: normIban(f.iban.value), closed: false };
       DB.accounts.push(na);
       let ob = parseUserAmount(f.ob.value) || 0;
       if (isDebtType(na.type)) ob = -Math.abs(ob);
       if (ob) newTx({ accountId: na.id, date: f.obdate.value || todayISO(), amount: ob, payee: 'Beginsaldo', ob: true, status: 'R' });
       changed(); closeModal(w); go('account', { accountId: na.id });
     } else {
-      Object.assign(acc, { name, type: f.type.value, note: f.note.value.trim(), closed: f.closed.checked });
+      Object.assign(acc, { name, type: f.type.value, note: f.note.value.trim(), iban: normIban(f.iban.value), closed: f.closed.checked });
       changed(); closeModal(w); render();
     }
   };
@@ -2040,6 +2045,315 @@ function runImport(plan) {
 }
 function idxTx(id) { return DB.transactions.find(t => t.id === id); }
 
+/* ===================================================================
+   Bank CSV import (ING, Rabobank, ABN AMRO, ASN/SNS/RegioBank, Triodos,
+   Knab, bunq … and any other bank via the column choices).
+   =================================================================== */
+let csvPlan = null;
+const normIban = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const ibanMatch = (accIban, key) => { const a = normIban(accIban); if (!a || !key) return false; if (a === key) return true; return /^\d{5,10}$/.test(key) && a.endsWith(key.padStart(10, '0')); };
+const looksIban = s => /^[A-Z]{2}\d{2}[A-Z0-9]{8,30}$/.test(normIban(s));
+const CSV_ROLES = [
+  ['', '— niet gebruiken —'], ['date', 'Datum'], ['amount', 'Bedrag'], ['sign', 'Af / Bij (debet/credit)'],
+  ['debit', 'Bedrag af'], ['credit', 'Bedrag bij'], ['payee', 'Naam tegenpartij'], ['cp', 'Tegenrekening (IBAN)'],
+  ['desc', 'Omschrijving'], ['own', 'Eigen rekening (IBAN)'], ['bal', 'Saldo na boeking'],
+];
+function detectDelim(text) {
+  const lines = text.split('\n').slice(0, 15);
+  let best = ',', bestScore = -1;
+  for (const d of [';', ',', '\t', '|']) {
+    const counts = lines.map(l => { let n = 0, q = false; for (const ch of l) { if (ch === '"') q = !q; else if (ch === d && !q) n++; } return n; }).filter(n => n > 0);
+    if (!counts.length) continue;
+    const same = counts.filter(n => n === counts[0]).length;
+    const score = same * 100 + counts[0];
+    if (score > bestScore) { bestScore = score; best = d; }
+  }
+  return best;
+}
+function parseCSV(text, d) {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === d) { row.push(cell); cell = ''; }
+    else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+    else if (ch !== '\r') cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.map(r => r.map(c => c.trim())).filter(r => r.some(c => c));
+}
+function parseBankAmount(s, comma) {
+  s = String(s || '').trim();
+  if (!s) return null;
+  let neg = /^-|^\(|-$/.test(s) || /^−/.test(s);
+  s = s.replace(/[^\d.,]/g, '');
+  if (!s) return null;
+  s = comma ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  const v = Math.round(parseFloat(s) * 100);
+  return isFinite(v) ? (neg ? -v : v) : null;
+}
+const isDateLike = s => /^\d{8}$/.test(s) || /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test(s);
+const isAmountLike = s => /^[+\-−]?\s*(€\s*)?\d{1,3}([.,]?\d{3})*([.,]\d{1,2})?$/.test(String(s).trim()) && /\d/.test(s);
+function guessRoles(headers, rows) {
+  const n = Math.max(...rows.slice(0, 50).map(r => r.length), headers ? headers.length : 0);
+  const roles = new Array(n).fill('');
+  const col = i => rows.slice(0, 60).map(r => r[i] || '').filter(Boolean);
+  const set = (i, r) => { if (i >= 0 && i < n && !roles[i] && (r === 'desc' || !roles.includes(r))) roles[i] = r; };
+  if (headers) {
+    const h = headers.map(x => x.toLowerCase().replace(/[^a-zà-ü0-9/ ]/g, '').trim());
+    const find = (re, not) => h.findIndex((x, i) => !roles[i] && re.test(x) && !(not && not.test(x)));
+    set(find(/^(datum|date|boekdatum|boekingsdatum|transactiedatum|transactiondate|value date|datum transactie)$/), 'date');
+    set(find(/datum|date/, /rente|valuta|interest|journaal|value/), 'date');
+    set(find(/^(af bij|afbij|debet ?credit|credit ?debet|d ?c|bij af|debitcredit)$/), 'sign');
+    set(find(/^(bedrag af|debet|debit|uitgaven|af)$/), 'debit');
+    set(find(/^(bedrag bij|credit|inkomsten|bij)$/), 'credit');
+    set(find(/bedrag|amount|transactiebedrag/, /oorspr|original|saldo|balance/), 'amount');
+    set(find(/saldo na|balance after|saldo/), 'bal');
+    set(find(/^(naam tegenpartij|naam ?\/ ?omschrijving|tegenrekeninghouder|naam tegenrekening|counterparty|naam|name|tegenpartij|begunstigde)$/), 'payee');
+    set(find(/naam|name/, /initi|uiteindelijk|bank/), 'payee');
+    set(find(/tegenrekening|counterparty account|tegenpartij iban|iban tegen|counter/), 'cp');
+    set(find(/^(iban\/bban|rekening|rekeningnummer|iban|account|eigen rekening|opdrachtgeversrekening)$/), 'own');
+    h.forEach((x, i) => { if (!roles[i] && /mededeling|omschrijving|description|memo|^betalingskenmerk$/.test(x) && !/naam/.test(x)) roles[i] = 'desc'; });
+  }
+  // content-based fill-in (files without a header line, or unknown headers)
+  if (!roles.includes('date')) { for (let i = 0; i < n; i++) { const c = col(i); if (c.length && c.every(isDateLike)) { set(i, 'date'); break; } } }
+  const ibanCols = [];
+  for (let i = 0; i < n; i++) { const c = col(i); if (c.length && c.filter(looksIban).length >= c.length * 0.6) ibanCols.push(i); }
+  for (const i of ibanCols) { if (roles[i]) continue; const c = col(i).map(normIban); const constant = c.every(x => x === c[0]); set(i, constant && !roles.includes('own') ? 'own' : 'cp'); }
+  if (!roles.includes('sign')) { for (let i = 0; i < n; i++) { if (roles[i]) continue; const c = col(i).map(s => s.toLowerCase()); if (c.length && c.every(s => /^(af|bij|d|c|debet|credit|debit)$/.test(s))) { set(i, 'sign'); break; } } }
+  if (!roles.includes('amount') && !roles.includes('debit')) {
+    const cands = [];
+    for (let i = 0; i < n; i++) { if (roles[i]) continue; const c = col(i); if (c.length && c.every(isAmountLike) && c.some(s => /[.,]\d{2}$/.test(s))) cands.push(i); }
+    // e.g. ABN AMRO: start balance, end balance, amount → the column that varies in sign or equals end-start
+    if (cands.length >= 3) {
+      const [a, b, c] = cands.slice(0, 3); set(c, 'amount'); set(b, 'bal');
+    } else if (cands.length === 2) {
+      const signed = cands.find(i => col(i).some(s => /^[+\-−]/.test(s)));
+      set(signed != null ? signed : cands[0], 'amount');
+      const other = cands.find(i => !roles[i]); if (other != null && headers == null) set(other, 'bal');
+    } else if (cands.length) set(cands[0], 'amount');
+  }
+  if (!roles.includes('payee')) { // the text column with the most distinct short values
+    let best = -1, bestScore = 0;
+    for (let i = 0; i < n; i++) { if (roles[i]) continue; const c = col(i); if (!c.length || c.some(s => isAmountLike(s) || isDateLike(s))) continue; const avg = c.reduce((a, s) => a + s.length, 0) / c.length; const distinct = new Set(c).size; if (avg > 2 && avg < 45 && distinct > 1 && distinct > bestScore) { bestScore = distinct; best = i; } }
+    if (best >= 0) set(best, 'payee');
+  }
+  if (!roles.includes('desc')) { let best = -1, len = 0; for (let i = 0; i < n; i++) { if (roles[i]) continue; const c = col(i); if (!c.length || c.every(isAmountLike)) continue; const avg = c.reduce((a, s) => a + s.length, 0) / c.length; if (avg > len && avg > 12) { len = avg; best = i; } } if (best >= 0) set(best, 'desc'); }
+  return roles;
+}
+function detectBank(text, headers, rows) {
+  const h = (headers || []).join(' ').toLowerCase();
+  if (/naam \/ omschrijving/.test(h) && /af bij/.test(h)) return 'ING';
+  if (/iban\/bban/.test(h) && /naam tegenpartij/.test(h)) return 'Rabobank';
+  if (/^knab/i.test(text.trim()) || /tegenrekeninghouder/.test(h)) return 'Knab';
+  if (/counterparty/.test(h) && /interest date/.test(h)) return 'bunq';
+  if (!headers && rows[0] && rows[0].length === 8 && /^\d{6,10}$/.test(rows[0][0]) && /^EUR$/i.test(rows[0][1])) return 'ABN AMRO';
+  if (!headers && rows[0] && rows[0].length >= 18 && rows.every(r => isDateLike(r[0]))) return 'ASN / SNS / RegioBank';
+  if (!headers && rows[0] && rows.every(r => r.some(c => /^(debet|credit)$/i.test(c)))) return 'Triodos';
+  return null;
+}
+function analyzeCSV(name, text) {
+  text = text.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+  // Knab and some others put a title line above the header
+  const lines = text.split('\n');
+  if (/^knab/i.test(lines[0]) && lines.length > 1) text = lines.slice(1).join('\n');
+  const delim = detectDelim(text);
+  let rows = parseCSV(text, delim);
+  if (!rows.length) return null;
+  const first = rows[0];
+  const hasHeader = !first.some(isDateLike) && !first.some(c => isAmountLike(c) && /[.,]\d{2}$/.test(c)) && first.filter(c => /[a-z]/i.test(c)).length >= Math.min(3, first.length);
+  const headers = hasHeader ? first : null;
+  if (hasHeader) rows = rows.slice(1);
+  rows = rows.filter(r => r.length >= 2);
+  const sig = (headers ? 'h:' + headers.join('|').toLowerCase() : 'n:' + delim + ':' + Math.max(...rows.map(r => r.length)));
+  const saved = (DB.settings.csvMaps || {})[sig];
+  const roles = saved ? saved.roles.slice() : guessRoles(headers, rows);
+  const bank = detectBank(text, headers, rows);
+  if (!saved && bank === 'ASN / SNS / RegioBank') { roles.fill(''); Object.assign(roles, { 0: 'date', 1: 'own', 2: 'cp', 3: 'payee', 10: 'amount', 17: 'desc' }); }
+  if (!saved && bank === 'ABN AMRO') { roles.fill(''); Object.assign(roles, { 0: 'own', 2: 'date', 4: 'bal', 6: 'amount', 7: 'desc' }); }
+  const f = { name, headers, rows, delim, sig, roles, bank, remembered: !!saved };
+  const di = roles.indexOf('date'), ai = [roles.indexOf('amount'), roles.indexOf('debit'), roles.indexOf('credit'), roles.indexOf('bal')].filter(i => i >= 0);
+  f.dateOrder = saved ? saved.dateOrder : (detectDateOrder(di >= 0 ? rows.map(r => r[di]).filter(Boolean) : []) || 'DMY');
+  f.comma = saved ? saved.comma : detectDecimalComma(rows.flatMap(r => ai.map(i => r[i] || '')).filter(Boolean));
+  // which account(s)?
+  const oi = roles.indexOf('own');
+  const ibans = oi >= 0 ? Array.from(new Set(rows.map(r => normIban(r[oi])).filter(Boolean))) : [];
+  f.byIban = {};
+  for (const ib of ibans) { const a = DB.accounts.find(x => ibanMatch(x.iban, ib)); f.byIban[ib] = a ? a.id : (saved && saved.byIban && saved.byIban[ib]) || 'new'; }
+  const nameGuess = name.replace(/\.(csv|txt|tab)$/i, '');
+  f.target = (saved && saved.target && DB.accounts.some(a => a.id === saved.target)) ? saved.target : (DB.accounts.find(a => a.name.toLowerCase() === nameGuess.toLowerCase()) || {}).id || 'new';
+  f.newNames = { __single: f.bank ? f.bank : nameGuess };
+  for (const ib of ibans) f.newNames[ib] = (f.bank ? f.bank.split(' ')[0] : 'Rekening') + ' …' + ib.slice(-4);
+  return f;
+}
+/* Turn the file rows into transactions using the chosen columns */
+function csvRecords(f) {
+  const R = f.roles, ix = r => R.indexOf(r), descIx = R.map((r, i) => r === 'desc' ? i : -1).filter(i => i >= 0);
+  const out = [], bad = [];
+  if (ix('date') < 0) return { out, bad, problem: 'Kies welke kolom de datum bevat.' };
+  if (ix('amount') < 0 && ix('debit') < 0 && ix('credit') < 0) return { out, bad, problem: 'Kies welke kolom het bedrag bevat.' };
+  f.rows.forEach((r, n) => {
+    const date = parseQifDate(r[ix('date')], f.dateOrder);
+    let amount = null;
+    if (ix('amount') >= 0) amount = parseBankAmount(r[ix('amount')], f.comma);
+    if (amount == null && (ix('debit') >= 0 || ix('credit') >= 0)) {
+      const d = ix('debit') >= 0 ? parseBankAmount(r[ix('debit')], f.comma) : null, c = ix('credit') >= 0 ? parseBankAmount(r[ix('credit')], f.comma) : null;
+      if (d) amount = -Math.abs(d); else if (c) amount = Math.abs(c); else if (d === 0 || c === 0) amount = 0;
+    }
+    if (ix('sign') >= 0 && amount != null) { const sg = String(r[ix('sign')] || '').trim().toLowerCase(); if (/^(af|d|debet|debit)$/.test(sg)) amount = -Math.abs(amount); else if (/^(bij|c|credit)$/.test(sg)) amount = Math.abs(amount); }
+    if (!date || amount == null) { bad.push(n + 1); return; }
+    let payee = ix('payee') >= 0 ? (r[ix('payee')] || '').replace(/\s+/g, ' ').trim() : '';
+    let memo = descIx.map(i => r[i] || '').filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    if (memo === payee) memo = '';
+    let cp = ix('cp') >= 0 ? normIban(r[ix('cp')]) : '';
+    if (!payee || !cp) { const x = fromDescription(memo); if (!payee && x.payee) payee = x.payee; if (!cp && x.cp) cp = x.cp; }
+    out.push({ n, date, amount, payee, memo, cp, own: ix('own') >= 0 ? normIban(r[ix('own')]) : '', bal: ix('bal') >= 0 ? parseBankAmount(r[ix('bal')], f.comma) : null });
+  });
+  return { out, bad, problem: null };
+}
+/* Banks such as ABN AMRO put name and IBAN inside the description */
+function fromDescription(d) {
+  d = String(d || '');
+  let m, payee = '', cp = '';
+  if ((m = d.match(/\/NAME\/([^/]+)\//i))) payee = m[1];
+  else if ((m = d.match(/Naam:\s*(.+?)(\s{2,}|\s+(Omschrijving|Kenmerk|IBAN|BIC|Machtiging):|$)/i))) payee = m[1];
+  else if ((m = d.match(/^(BEA|GEA|eCom)\b[^,]*,\s*(Betaalpas|Apple Pay|Google Pay)?\s*(.+?),\s*PAS\d*/i))) payee = m[3];
+  else if ((m = d.match(/^(BEA|GEA)\s+NR:\S+\s+\d{2}\.\d{2}\.\d{2}\/\d{2}[.:]\d{2}\s+(.+?)(,PAS|\s{2,}|$)/i))) payee = m[2];
+  if ((m = d.match(/\/IBAN\/([A-Z]{2}\d{2}[A-Z0-9]+)\//i)) || (m = d.match(/IBAN:\s*([A-Z]{2}\d{2}[A-Z0-9 ]{10,30}?)(\s{2,}|\s+[A-Z][a-z]+:|$)/))) cp = normIban(m[1]);
+  return { payee: payee.trim(), cp };
+}
+const payeeWords = s => String(s || '').toLowerCase().replace(/[0-9]+/g, ' ').replace(/[^a-zà-ü ]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').filter(w => w.length > 1);
+const payeeKeys = s => { const w = payeeWords(s); return [w.slice(0, 3).join(' '), w.slice(0, 2).join(' ')].filter((k, i, a) => k && a.indexOf(k) === i); };
+/* Learn from earlier transactions: same counter-IBAN or same payee → same category */
+function buildGuesser() {
+  const byCp = new Map(), byPayee = new Map();
+  for (const t of DB.transactions.slice().sort(cmpTx)) {
+    if (t.linkId || t.ob) continue;
+    const g = t.splits && t.splits.length ? null : t.transferAccountId ? { transfer: t.transferAccountId } : t.categoryId ? { cat: t.categoryId } : null;
+    if (!g) continue;
+    if (t.cp) byCp.set(t.cp, g);
+    for (const k of payeeKeys(t.payee)) byPayee.set(k, g);
+  }
+  return (acctId, rec) => {
+    if (rec.cp) { const own = DB.accounts.find(a => ibanMatch(a.iban, rec.cp)); if (own && own.id !== acctId) return { transfer: own.id, why: 'eigen rekening' }; }
+    let g = (rec.cp && byCp.get(rec.cp)) || payeeKeys(rec.payee).map(k => byPayee.get(k)).find(Boolean);
+    if (g && g.transfer === acctId) g = null;
+    return g || null;
+  };
+}
+function csvTargetFor(f, rec) {
+  if (rec.own && f.byIban[rec.own] != null) return f.byIban[rec.own];
+  return f.target;
+}
+function runCsvImport(plan) {
+  const st = { tx: 0, dup: 0, matched: 0, cat: 0, uncat: 0, bad: 0, newAccounts: [], checks: [] };
+  const guess = buildGuesser();
+  // create accounts where needed
+  const resolve = {}, createdIds = new Set();
+  const accFor = (f, key, suggested) => {
+    const sel = key === '__single' ? f.target : f.byIban[key];
+    if (sel && sel !== 'new') return sel;
+    const k = f.name + '|' + key;
+    if (resolve[k]) return resolve[k];
+    const nm = ((f.newNames || {})[key] || suggested).trim() || 'Bankrekening';
+    let a = DB.accounts.find(x => x.name.toLowerCase() === nm.toLowerCase());
+    if (!a) { a = { id: uid(), name: nm, type: 'checking', note: '', closed: false, iban: key !== '__single' && looksIban(key) ? key : '' }; createdIds.add(a.id); DB.accounts.push(a); st.newAccounts.push(nm); _idx = null; }
+    return (resolve[k] = a.id);
+  };
+  for (const f of plan.files) {
+    const { out, bad } = csvRecords(f);
+    st.bad += bad.length;
+    // put the file in date order (banks often list the newest first)
+    const desc = out.length > 1 && out[0].date > out[out.length - 1].date;
+    const recs = desc ? out.slice().reverse() : out.slice();
+    // existing transactions per account|date|amount, so overlapping downloads are not imported twice
+    const have = new Map();
+    for (const t of DB.transactions) { const k = t.accountId + '|' + t.date + '|' + t.amount; have.set(k, (have.get(k) || 0) + 1); }
+    const groups = new Map();
+    for (const rec of recs) {
+      const key = rec.own && f.byIban[rec.own] != null ? rec.own : '__single';
+      const acctId = accFor(f, key, rec.own ? 'Rekening ' + rec.own.slice(-4) : f.name.replace(/\.(csv|txt|tab)$/i, ''));
+      if (!groups.has(acctId)) groups.set(acctId, []);
+      groups.get(acctId).push(rec);
+    }
+    for (const [acctId, list] of groups) {
+      if (createdIds.has(acctId) && list[0].bal != null && !DB.transactions.some(t => t.accountId === acctId && t.ob)) {
+        const ob = list[0].bal - list[0].amount;
+        if (ob) newTx({ accountId: acctId, date: list[0].date, amount: ob, payee: 'Beginsaldo', ob: true, status: 'R' });
+      }
+    }
+    for (const [acctId, list] of groups) {
+      const acc = idx().acc.get(acctId) || DB.accounts.find(a => a.id === acctId);
+      if (acc && !acc.iban && list[0].own && looksIban(list[0].own)) acc.iban = list[0].own;
+      for (const rec of list) {
+        const k = acctId + '|' + rec.date + '|' + rec.amount;
+        if ((have.get(k) || 0) > 0) { have.set(k, have.get(k) - 1); st.dup++; continue; }
+        const g = guess(acctId, rec);
+        if (g && g.transfer) {
+          // the other side may already be there (imported from the other bank file, or entered by hand) within a few days
+          const near = DB.transactions.find(t => t.accountId === acctId && t.amount === rec.amount && Math.abs(Date.parse(t.date) - Date.parse(rec.date)) <= 4 * 864e5 && ((t.linkId && (idxTx(t.linkId) || {}).accountId === g.transfer) || t.transferAccountId === g.transfer) && !t._csvm);
+          if (near) { near._csvm = 1; if (!near.status) near.status = 'c'; st.matched++; continue; }
+          const t = newTx({ accountId: acctId, date: rec.date, amount: rec.amount, payee: rec.payee, memo: rec.memo, status: 'c', transferAccountId: g.transfer, cp: rec.cp });
+          syncLegs(t); st.tx++; st.cat++; continue;
+        }
+        newTx({ accountId: acctId, date: rec.date, amount: rec.amount, payee: rec.payee, memo: rec.memo, status: 'c', categoryId: g ? g.cat : null, cp: rec.cp });
+        st.tx++; if (g) st.cat++; else st.uncat++;
+      }
+      const last = list[list.length - 1];
+      if (last.bal != null) { _idx = null; const ours = (idx().byAcc.get(acctId) || []).filter(t => t.date <= last.date).reduce((s, t) => s + t.amount, 0); st.checks.push({ name: acc.name, bank: last.bal, ours, date: last.date }); }
+    }
+    // remember the column choices for the next file from this bank
+    DB.settings.csvMaps = DB.settings.csvMaps || {};
+    DB.settings.csvMaps[f.sig] = { roles: f.roles, dateOrder: f.dateOrder, comma: f.comma, target: f.target !== 'new' ? f.target : (resolve[f.name + '|__single'] || null), byIban: Object.fromEntries(Object.entries(f.byIban).map(([ib, v]) => [ib, v === 'new' ? (resolve[f.name + '|' + ib] || 'new') : v])) };
+  }
+  for (const t of DB.transactions) delete t._csvm;
+  changed();
+  return st;
+}
+function csvPlanHTML() {
+  if (!csvPlan) return '';
+  const I = idx(), guess = buildGuesser();
+  return csvPlan.files.map((f, fi) => {
+    const { out, bad, problem } = csvRecords(f);
+    const n = Math.max(...f.rows.slice(0, 50).map(r => r.length));
+    const sample = c => f.rows.slice(0, 3).map(r => r[c] || '').filter(Boolean).map(v => esc(v.length > 28 ? v.slice(0, 27) + '…' : v)).join('<br>');
+    const accOpts = sel => `<option value="new" ${sel === 'new' ? 'selected' : ''}>Een nieuwe rekening…</option>` + DB.accounts.filter(a => !a.closed || a.id === sel).map(a => `<option value="${a.id}" ${a.id === sel ? 'selected' : ''}>${esc(a.name)}</option>`).join('');
+    const ibans = Object.keys(f.byIban);
+    const accRows = ibans.length ? ibans.map(ib => `<div class="row" style="margin-bottom:6px;flex-wrap:wrap"><span style="min-width:190px"><b>${esc(ib)}</b></span><select data-csv="${fi}:iban:${ib}" style="width:auto">${accOpts(f.byIban[ib])}</select>${f.byIban[ib] === 'new' ? `<input data-csv="${fi}:newname:${ib}" placeholder="Naam van de nieuwe rekening" value="${esc((f.newNames || {})[ib] || '')}" style="width:auto;flex:1;min-width:180px">` : ''}</div>`).join('')
+      : `<div class="row" style="flex-wrap:wrap"><select data-csv="${fi}:target:-" style="width:auto">${accOpts(f.target)}</select>${f.target === 'new' ? `<input data-csv="${fi}:newname:__single" placeholder="Naam van de nieuwe rekening" value="${esc((f.newNames || {}).__single || f.name.replace(/\.(csv|txt|tab)$/i, ''))}" style="width:auto;flex:1;min-width:180px">` : ''}</div>`;
+    const prev = out.slice(0, 8).map(rec => {
+      const acctId = csvTargetFor(f, rec); const g = guess(acctId === 'new' ? null : acctId, rec);
+      const lab = g ? (g.transfer ? '↔ ' + esc(accName(g.transfer)) : esc(catName(g.cat))) : '<span class="muted">—</span>';
+      return `<tr><td>${fmtDate(rec.date)}</td><td>${esc(rec.payee)}</td><td class="muted" style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(rec.memo)}</td><td class="num">${moneyHTML(rec.amount)}</td><td>${lab}</td></tr>`;
+    }).join('');
+    return `<div class="card" style="margin-top:16px"><h2>${esc(f.name)} <span class="hint">· ${f.rows.length.toLocaleString('nl-NL')} regels${f.bank ? ' · herkend als ' + esc(f.bank) : ''}${f.remembered ? ' · kolomkeuze van de vorige keer' : ''}</span></h2>
+      <h3 class="csvh">In welke rekening?</h3>${accRows}
+      <details ${problem || !f.bank && !f.remembered ? 'open' : ''} style="margin-top:14px"><summary>Kolommen ${problem ? '' : '(alleen aanpassen als de voorbeeldregels hieronder niet kloppen)'}</summary>
+        <div class="ywrap" style="margin-top:8px"><table class="t csvmap"><thead><tr><th>Kolom</th><th>Voorbeeld</th><th>Betekenis</th></tr></thead><tbody>
+        ${Array.from({ length: n }, (_, c) => `<tr><td>${esc(f.headers ? f.headers[c] || 'Kolom ' + (c + 1) : 'Kolom ' + (c + 1))}</td><td class="muted" style="font-size:13px">${sample(c)}</td><td><select data-csv="${fi}:role:${c}" style="width:auto">${CSV_ROLES.map(([k, l]) => `<option value="${k}" ${f.roles[c] === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td></tr>`).join('')}
+        </tbody></table></div>
+        <div class="grid2" style="margin-top:12px">
+          <label style="margin:0">Datums staan als<select data-csv="${fi}:dateOrder:-"><option value="DMY" ${f.dateOrder === 'DMY' ? 'selected' : ''}>dag-maand-jaar</option><option value="YMD" ${f.dateOrder === 'YMD' ? 'selected' : ''}>jaar-maand-dag (ook 20261024)</option><option value="MDY" ${f.dateOrder === 'MDY' ? 'selected' : ''}>maand/dag/jaar</option></select></label>
+          <label style="margin:0">Bedragen gebruiken<select data-csv="${fi}:comma:-"><option value="1" ${f.comma ? 'selected' : ''}>een decimale komma (12,50)</option><option value="0" ${!f.comma ? 'selected' : ''}>een decimale punt (12.50)</option></select></label>
+        </div>
+      </details>
+      <h3 class="csvh">Voorbeeld</h3>
+      ${problem ? `<p class="neg">${esc(problem)}</p>` : `<table class="t"><thead><tr><th>Datum</th><th>Naam</th><th>Omschrijving</th><th class="num">Bedrag</th><th>Categorie</th></tr></thead><tbody>${prev}</tbody></table>
+        <p class="hint" style="margin-top:8px">${out.length.toLocaleString('nl-NL')} transacties${bad.length ? `; <span class="neg">${bad.length} regels konden niet worden gelezen (controleer datum en bedrag)</span>` : ''}. Categorieën worden overgenomen van eerdere transacties met dezelfde naam of tegenrekening; de rest kunt u daarna zelf invullen.</p>`}
+    </div>`;
+  }).join('') + `<div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn" data-act="csv-cancel">Annuleren</button><button class="btn primary" data-act="csv-run" ${csvPlan.files.some(f => csvRecords(f).problem) ? 'disabled' : ''}>Nu importeren</button></div>`;
+}
+async function readCsvFiles(files) {
+  const plan = { files: [] };
+  for (const file of files) {
+    const f = analyzeCSV(file.name, decodeBytes(await file.arrayBuffer()));
+    if (f && f.rows.length) plan.files.push(f);
+  }
+  return plan;
+}
+
+
 function viewImport() {
   const p = importPlan;
   let planHTML = '';
@@ -2072,9 +2386,21 @@ function viewImport() {
     }).join('') + `<div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn" data-act="imp-cancel">Annuleren</button><button class="btn primary" data-act="imp-run">Nu importeren</button></div>`;
   }
   return `<div class="page">
-    <div class="head"><div class="grow"><h1>Importeren uit Microsoft Money</h1><p class="sub">Money kan elke rekening exporteren als QIF-bestand. Kasboek leest die bestanden, maakt uw rekeningen en categorieën opnieuw aan en koppelt overboekingen tussen rekeningen, zodat niets dubbel wordt geteld.</p></div></div>
+    <div class="head"><div class="grow"><h1>Importeren</h1></div></div>
     <div class="card">
-      <h2>1. Exporteren uit Money (op een Windows-computer)</h2>
+      <h2>Bankafschrift importeren (CSV)</h2>
+      <p class="sub" style="margin-top:0">Download in de internetbank of app van uw bank de transacties als <b>CSV</b>-bestand (bij ABN AMRO heet dat <b>TXT</b> of <b>TAB</b>) en kies het bestand hier. Kasboek herkent de bestanden van ING, Rabobank, ABN AMRO, ASN, SNS, RegioBank, Triodos, Knab en bunq; bij andere banken kiest u één keer welke kolom wat is.</p>
+      <ul class="steps" style="margin-top:6px">
+        <li>Transacties die al in Kasboek staan worden overgeslagen, dus een overlappende periode downloaden kan geen kwaad.</li>
+        <li>Categorieën worden overgenomen van eerdere transacties met dezelfde naam of tegenrekening.</li>
+        <li>Vul bij <b>Rekeninggegevens</b> de IBAN van uw rekeningen in; dan worden overboekingen tussen uw eigen rekeningen herkend.</li>
+      </ul>
+      <div class="row" style="margin-top:10px"><button class="btn primary" data-act="pick-csv">CSV-bestanden kiezen…</button></div>
+    </div>
+    ${csvPlanHTML()}
+    <details class="card" style="margin-top:16px" ${p || !DB.transactions.length ? 'open' : ''}><summary style="font-size:17px;font-weight:650;color:var(--ink)">Overnemen uit Microsoft Money (QIF)</summary>
+      <p class="sub">Money kan elke rekening exporteren als QIF-bestand. Kasboek leest die bestanden, maakt uw rekeningen en categorieën opnieuw aan en koppelt overboekingen tussen rekeningen, zodat niets dubbel wordt geteld.</p>
+      <h2 style="margin-top:16px">1. Exporteren uit Money (op een Windows-computer)</h2>
       <ol class="steps">
         <li>Open uw Money-bestand en kies <b>Bestand → Exporteren</b>.</li>
         <li>Vraagt Money om een indeling, kies dan <b>Loose QIF</b> (losse QIF). Lukt het importeren daarna niet, probeer dan <b>Strict QIF</b>.</li>
@@ -2087,7 +2413,7 @@ function viewImport() {
       <h2 style="margin-top:20px">2. Kies de bestanden</h2>
       <p class="sub" style="margin-top:0">U kunt meerdere bestanden tegelijk kiezen. Hetzelfde bestand twee keer importeren kan geen kwaad: transacties die al geïmporteerd zijn, worden overgeslagen.</p>
       <div class="row" style="margin-top:10px"><button class="btn primary" data-act="pick-qif">QIF-bestanden kiezen…</button></div>
-    </div>
+    </details>
     ${planHTML}
   </div>`;
 }
@@ -2176,6 +2502,19 @@ function afterRender() {
   const sc = $('#set-cur'); if (sc) sc.onchange = () => { DB.settings.currency = sc.value; resetFormats(); changed(); render(); };
   const sl = $('#set-loc'); if (sl) sl.onchange = () => { DB.settings.locale = sl.value; resetFormats(); changed(); render(); };
   const sth = $('#set-theme'); if (sth) sth.onchange = () => { DB.settings.theme = sth.value; applyTheme(); changed(); };
+  $$('[data-csv]').forEach(el => el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => {
+    const [fi, what, key] = el.dataset.csv.split(':'), f = csvPlan.files[+fi];
+    if (what === 'newname') { f.newNames[key] = el.value; return; }
+    if (what === 'role') { const c = +key; if (el.value && el.value !== 'desc') f.roles = f.roles.map(r => r === el.value ? '' : r); f.roles[c] = el.value; }
+    if (what === 'iban') f.byIban[key] = el.value;
+    if (what === 'target') f.target = el.value;
+    if (what === 'dateOrder') f.dateOrder = el.value;
+    if (what === 'comma') f.comma = el.value === '1';
+    if (what === 'role' && el.value === 'own') { const oi = c => c; const i = f.roles.indexOf('own'); f.byIban = {}; for (const r of f.rows) { const ib = normIban(r[i]); if (ib && !(ib in f.byIban)) { const a = DB.accounts.find(x => ibanMatch(x.iban, ib)); f.byIban[ib] = a ? a.id : 'new'; } } }
+    if (what === 'role' && !f.roles.includes('own')) f.byIban = {};
+    const open = Array.from(document.querySelectorAll('details')).map(d => d.open), y = $('#main').scrollTop;
+    render(); Array.from(document.querySelectorAll('details')).forEach((d, i) => { if (open[i]) d.open = true; }); $('#main').scrollTop = y;
+  }));
   $$('[data-imp]').forEach(el => el.addEventListener('change', () => {
     const [fi, gi, key] = el.dataset.imp.split(':');
     const f = importPlan.files[+fi];
@@ -2263,6 +2602,20 @@ document.addEventListener('click', async e => {
     case 'open-backup': return openBackup();
     case 'sample': makeSample(); return go('home');
     case 'pick-qif': $('#file-qif').value = ''; return $('#file-qif').click();
+    case 'pick-csv': $('#file-csv').value = ''; return $('#file-csv').click();
+    case 'csv-cancel': csvPlan = null; return render();
+    case 'csv-run': {
+      const st = runCsvImport(csvPlan); csvPlan = null;
+      go('home');
+      alertBox('Importeren voltooid', `<p><b>${st.tx.toLocaleString('nl-NL')}</b> transacties geïmporteerd${st.cat ? `, waarvan <b>${st.cat.toLocaleString('nl-NL')}</b> met een categorie of als overboeking` : ''}.</p>
+        ${st.uncat ? `<p>${st.uncat.toLocaleString('nl-NL')} transacties hebben nog geen categorie. Typ in een rekening <b>Zonder categorie</b> in het zoekvak om ze te vinden. Kasboek onthoudt de categorie die u kiest voor de volgende keer.</p>` : ''}
+        ${st.dup ? `<p>${st.dup.toLocaleString('nl-NL')} transacties stonden al in Kasboek en zijn overgeslagen.</p>` : ''}
+        ${st.matched ? `<p>${st.matched.toLocaleString('nl-NL')} overboekingen waren al geboekt vanaf de andere rekening en zijn daaraan gekoppeld.</p>` : ''}
+        ${st.newAccounts.length ? `<p>Nieuwe rekeningen: ${st.newAccounts.map(esc).join(', ')}.</p>` : ''}
+        ${st.bad ? `<p class="neg">${st.bad} regels konden niet worden gelezen en zijn overgeslagen.</p>` : ''}
+        ${st.checks.map(c => c.bank === c.ours ? `<p style="color:var(--pos)">✓ Het saldo van ${esc(c.name)} op ${fmtDate(c.date)} klopt met de bank: ${esc(money(c.bank))}.</p>` : `<p class="neg">Let op: volgens de bank was het saldo van ${esc(c.name)} op ${fmtDate(c.date)} ${esc(money(c.bank))}, in Kasboek ${esc(money(c.ours))} (verschil ${esc(money(c.bank - c.ours))}). Misschien ontbreken er oudere transacties of klopt het beginsaldo niet.</p>`).join('')}`);
+      return;
+    }
     case 'imp-cancel': importPlan = null; return render();
     case 'imp-run': {
       const st = runImport(importPlan); importPlan = null;
@@ -2288,6 +2641,12 @@ document.addEventListener('click', async e => {
       const keep = DB.settings; DB = emptyDB(); DB.settings = keep; changed(); return go('home');
     }
   }
+});
+$('#file-csv').addEventListener('change', async e => {
+  const files = Array.from(e.target.files || []); if (!files.length) return;
+  try { csvPlan = await readCsvFiles(files); } catch (err) { csvPlan = null; alertBox('Het bestand kan niet worden gelezen', esc(err.message)); }
+  if (csvPlan && !csvPlan.files.length) { alertBox('Niets om te importeren', 'Er zijn geen transacties gevonden in dit bestand.'); csvPlan = null; }
+  render();
 });
 $('#file-qif').addEventListener('change', async e => {
   const files = Array.from(e.target.files || []); if (!files.length) return;
