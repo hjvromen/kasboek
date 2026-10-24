@@ -56,6 +56,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .side .foot{margin-top:auto;padding:16px 10px 0;font-size:12px;color:var(--muted)}
 main{overflow:auto;min-width:0}
 .page{max-width:1120px;margin:0 auto;padding:26px 30px 70px}
+.page.wide{max-width:none}
 h1{font-size:26px;margin:0;letter-spacing:-.015em;font-weight:700}
 h2{font-size:17px;margin:0 0 12px;font-weight:650}
 .sub{color:var(--ink-2);margin:4px 0 0}
@@ -131,6 +132,21 @@ label>input,label>select,label>.row{margin-top:4px}
 .xfer-row{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:end;margin-bottom:12px}
 .xfer-row label{margin:0}
 .xfer-row .btn{margin-bottom:2px}
+.ywrap{overflow-x:auto;margin:0 -6px}
+.yt{font-size:12.5px;font-variant-numeric:tabular-nums}
+.yt th,.yt td{padding:6px 4px;white-space:nowrap}
+.yt .lbl{min-width:130px;padding-right:10px}
+.yt .lbl{position:sticky;left:0;background:var(--surface);z-index:1;text-align:left;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.yt thead .lbl{z-index:2}
+.yt tr.sect td{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding-top:16px;border-bottom:1px solid var(--line-strong)}
+.yt tr.grp td{font-weight:600}
+.yt tr.sub td{font-weight:650;border-top:1px solid var(--line-strong);background:var(--surface-2)}
+.yt tr.sub .lbl,.yt tr.net .lbl{background:var(--surface-2)}
+.yt tr.net td{font-weight:700;background:var(--surface-2);border-top:2px solid var(--line-strong)}
+.yt td.tot{font-weight:600;border-left:1px solid var(--line)}
+.yt td.yc{cursor:pointer}
+.yt td.yc:hover{background:var(--hover)}
+@media print{.ywrap{overflow:visible}.yt{min-width:0;font-size:8.5pt}.yt th,.yt td{padding:3px 4px}.no-print{display:none}}
 .splitsum{font-size:14px;color:var(--ink-2);display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 .hbars{display:flex;flex-direction:column;gap:2px}
 .hbar{display:grid;grid-template-columns:minmax(90px,200px) minmax(40px,1fr) auto 40px;gap:12px;align-items:center;border:0;background:none;padding:6px 6px;border-radius:7px;text-align:left;cursor:default;width:100%}
@@ -212,7 +228,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.5 (oktober 2026)';
+const APP_VERSION = '1.6 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -766,7 +782,7 @@ let state = { view: 'home' };
 const regState = { search: '', period: 'all', shown: 300 };
 let recon = null;
 let lastEnteredDate = null;
-let reportState = { type: 'spending', period: 'thisYear', custom: {}, account: 'all', drill: null, drill2: null, catSel: '' };
+let reportState = { type: 'spending', period: 'thisYear', custom: {}, account: 'all', drill: null, drill2: null, catSel: '', year: +todayISO().slice(0, 4), subs: true, cents: false };
 
 function go(view, extra) { state = Object.assign({ view }, extra || {}); if (view !== 'account') recon = null; regState.shown = 300; render(); $('#main').scrollTop = 0; }
 
@@ -999,7 +1015,7 @@ function exportRegisterCSV() {
 }
 function downloadCSV(name, rows) {
   const sep = localeDecimal() === ',' ? ';' : ',';
-  const q = v => { v = String(v == null ? '' : v); return /[";,\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const q = v => { v = String(v == null ? '' : v); return (v.includes(sep) || /["\n]/.test(v)) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   download(name, '﻿' + rows.map(r => r.map(q).join(sep)).join('\r\n'), 'text/csv');
 }
 
@@ -1444,6 +1460,7 @@ function wireCharts(root) {
 const REPORTS = [
   ['spending', 'Uitgaven per categorie'],
   ['income', 'Inkomsten per categorie'],
+  ['year', 'Jaaroverzicht'],
   ['incexp', 'Inkomsten en uitgaven'],
   ['trend', 'Categorie door de tijd'],
   ['networth', 'Vermogen door de tijd'],
@@ -1467,6 +1484,76 @@ function spendingRows(flows, drill, kind) {
     e.value += v * sign; m.set(key, e);
   }
   return Array.from(m.values()).filter(r => r.value > 0).sort((a, b) => b.value - a.value);
+}
+/* ---------- Jaaroverzicht: categories × months for one year ---------- */
+const MONTHS_SHORT = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+function yearFlows(year, accountId) {
+  const m = new Map();
+  const add = (k, mi, v) => { if (!m.has(k)) m.set(k, new Array(12).fill(0)); m.get(k)[mi] += v; };
+  const y = String(year);
+  for (const t of DB.transactions) {
+    if (t.linkId || t.ob || t.date.slice(0, 4) !== y) continue;
+    if (accountId !== 'all' && t.accountId !== accountId) continue;
+    const mi = +t.date.slice(5, 7) - 1;
+    if (t.splits && t.splits.length) { for (const s of t.splits) if (!s.transferAccountId) add(s.categoryId || (s.amount > 0 ? '_in' : '_out'), mi, s.amount); }
+    else if (!t.transferAccountId) add(t.categoryId || (t.amount > 0 ? '_in' : '_out'), mi, t.amount);
+  }
+  return m;
+}
+function yearRows(year, accountId, showSubs) {
+  const I = idx(), fl = yearFlows(year, accountId);
+  const zero = () => new Array(12).fill(0);
+  const sum = (a, b) => a.map((v, i) => v + b[i]);
+  const nz = a => a.some(v => v);
+  const out = { income: [], expense: [], totals: {} };
+  for (const kind of ['income', 'expense']) {
+    const sign = kind === 'expense' ? -1 : 1;
+    const val = k => (fl.get(k) || zero()).map(v => v * sign);
+    let tot = zero();
+    for (const top of sortedTopCats(kind)) {
+      const subs = (I.childrenOf.get(top.id) || []).map(c => ({ c, v: val(c.id) })).filter(x => nz(x.v));
+      const own = val(top.id);
+      const all = subs.reduce((a, x) => sum(a, x.v), own);
+      if (!nz(all)) continue;
+      tot = sum(tot, all);
+      if (showSubs && subs.length) {
+        out[kind].push({ label: top.name, v: all, level: 0, group: true, ids: [top.id, ...(I.childrenOf.get(top.id) || []).map(c => c.id)] });
+        if (nz(own)) out[kind].push({ label: top.name + ' (algemeen)', v: own, level: 1, ids: [top.id] });
+        for (const x of subs) out[kind].push({ label: x.c.name, v: x.v, level: 1, ids: [x.c.id] });
+      } else out[kind].push({ label: top.name, v: all, level: 0, ids: [top.id, ...(I.childrenOf.get(top.id) || []).map(c => c.id)] });
+    }
+    // categories of the other kind that still hold money on this side are rare; uncategorized amounts:
+    const unk = kind === 'income' ? '_in' : '_out';
+    if (fl.has(unk)) { const v = val(unk); if (nz(v)) { out[kind].push({ label: 'Zonder categorie', v, level: 0, ids: [unk] }); tot = sum(tot, v); } }
+    out.totals[kind] = tot;
+  }
+  out.totals.net = out.totals.income.map((v, i) => v - out.totals.expense[i]);
+  return out;
+}
+function yearsWithData() {
+  const ys = new Set([+todayISO().slice(0, 4)]);
+  for (const t of DB.transactions) ys.add(+t.date.slice(0, 4));
+  return Array.from(ys).sort((a, b) => b - a);
+}
+function txForCategories(from, to, accountId, ids) {
+  const set = new Set(ids), out = [];
+  for (const t of DB.transactions) {
+    if (t.linkId || t.ob || t.date < from || t.date > to) continue;
+    if (accountId !== 'all' && t.accountId !== accountId) continue;
+    if (t.splits && t.splits.length) { for (const s of t.splits) if (!s.transferAccountId && set.has(s.categoryId || (s.amount > 0 ? '_in' : '_out'))) out.push({ t, amount: s.amount, memo: s.memo || t.memo }); }
+    else if (!t.transferAccountId && set.has(t.categoryId || (t.amount > 0 ? '_in' : '_out'))) out.push({ t, amount: t.amount, memo: t.memo });
+  }
+  return out.sort((a, b) => cmpTx(a.t, b.t));
+}
+function showYearCell(label, ids, year, mi) {
+  const from = mi == null ? year + '-01-01' : isoOf(year, mi + 1, 1), to = mi == null ? year + '-12-31' : isoOf(year, mi + 1, 31);
+  const list = txForCategories(from, to, reportState.account, ids);
+  const total = list.reduce((s, x) => s + x.amount, 0);
+  const when = mi == null ? String(year) : fmtMonth(year + '-' + pad(mi + 1));
+  const w = openModal({ wide: true, title: esc(label) + ' — ' + esc(when), body: list.length ? `<table class="t"><thead><tr><th>Datum</th><th>Rekening</th><th>Begunstigde</th><th>Notitie</th><th class="num">Bedrag</th></tr></thead><tbody>
+    ${list.map(x => `<tr class="click" data-goacc="${x.t.accountId}"><td>${fmtDate(x.t.date)}</td><td>${esc(accName(x.t.accountId))}</td><td>${esc(x.t.payee)}</td><td class="muted">${esc(x.memo)}</td><td class="num">${moneyHTML(x.amount)}</td></tr>`).join('')}
+    </tbody><tfoot><tr><td colspan="4">Totaal (${list.length} transacties)</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>` : '<p class="muted">Geen transacties.</p>' });
+  $$('[data-goacc]', w).forEach(r => r.onclick = () => { closeModal(w); go('account', { accountId: r.dataset.goacc }); });
 }
 function txForCategory(from, to, accountId, catId) {
   const out = [];
@@ -1519,6 +1606,30 @@ function viewReports() {
         : `<p class="muted">Niets geboekt in deze periode.</p>`}`;
       csv = [['Categorie', 'Bedrag']].concat(rows.map(r => [r.label, moneyPlain(r.value)]));
     }
+  } else if (rs.type === 'year') {
+    const Y = rs.year, R = yearRows(Y, rs.account, rs.subs);
+    reportState._yearRows = R;
+    const nf = new Intl.NumberFormat(DB.settings.locale, { minimumFractionDigits: rs.cents ? 2 : 0, maximumFractionDigits: rs.cents ? 2 : 0 });
+    const num = v => `<span class="${v < 0 ? 'neg' : ''}">${esc(nf.format(v / 100))}</span>`;
+    const cell = v => v ? num(v) : '<span class="muted">–</span>';
+    const avg = v => Math.round(v.reduce((a, b) => a + b, 0) / 12);
+    const totalOf = v => v.reduce((a, b) => a + b, 0);
+    const line = (r, key, idx2) => `<tr class="${r.group ? 'grp' : ''}"><td class="lbl" style="padding-left:${10 + r.level * 18}px">${esc(r.label)}</td>${r.v.map((v, i) => `<td class="num ${v ? 'yc' : ''}" ${v ? `data-yc="${key}:${idx2}:${i}"` : ''}>${cell(v)}</td>`).join('')}<td class="num tot yc" data-yc="${key}:${idx2}:-">${cell(totalOf(r.v))}</td><td class="num muted">${cell(avg(r.v))}</td></tr>`;
+    const totLine = (label, v, cls) => `<tr class="${cls}"><td class="lbl">${label}</td>${v.map(x => `<td class="num">${num(x)}</td>`).join('')}<td class="num tot">${num(totalOf(v))}</td><td class="num">${num(avg(v))}</td></tr>`;
+    const head = `<tr><th class="lbl"></th>${MONTHS_SHORT.map(m => `<th class="num">${m}</th>`).join('')}<th class="num">Totaal</th><th class="num">Gem./mnd</th></tr>`;
+    const sect = (title, kind) => `<tr class="sect"><td colspan="15">${title}</td></tr>` + (R[kind].length ? R[kind].map((r, i) => line(r, kind, i)).join('') : `<tr><td class="lbl muted" colspan="15">Geen ${title.toLowerCase()} in ${Y}.</td></tr>`) + totLine('Totaal ' + title.toLowerCase(), R.totals[kind], 'sub');
+    content = `<style>@media print{@page{size:A4 landscape;margin:12mm}}</style>
+      <div class="ywrap"><table class="t yt"><thead>${head}</thead><tbody>
+      ${sect('Inkomsten', 'income')}
+      ${sect('Uitgaven', 'expense')}
+      <tr class="sect"><td colspan="15"></td></tr>
+      ${totLine('Inkomsten min uitgaven', R.totals.net, 'net')}
+      </tbody></table></div>
+      <p class="hint" style="margin-top:10px">Bedragen in ${esc(DB.settings.currency === 'EUR' ? 'euro' : DB.settings.currency)}${rs.cents ? '' : ', afgerond op hele bedragen (de export naar spreadsheet bevat de centen)'}. <span class="no-print">Klik op een bedrag om de transacties te zien.</span> Overboekingen tussen uw eigen rekeningen tellen niet mee.</p>`;
+    const csvLine = r => [(r.level ? '   ' : '') + r.label, ...r.v.map(moneyPlain), moneyPlain(totalOf(r.v)), moneyPlain(avg(r.v))];
+    csv = [['', ...MONTHS_SHORT, 'Totaal', 'Gemiddeld per maand'], ['Inkomsten'], ...R.income.map(csvLine), ['Totaal inkomsten', ...R.totals.income.map(moneyPlain), moneyPlain(totalOf(R.totals.income)), moneyPlain(avg(R.totals.income))],
+      ['Uitgaven'], ...R.expense.map(csvLine), ['Totaal uitgaven', ...R.totals.expense.map(moneyPlain), moneyPlain(totalOf(R.totals.expense)), moneyPlain(avg(R.totals.expense))],
+      ['Inkomsten min uitgaven', ...R.totals.net.map(moneyPlain), moneyPlain(totalOf(R.totals.net)), moneyPlain(avg(R.totals.net))]];
   } else if (rs.type === 'incexp') {
     const months = clampMonths(from, to);
     const inc = [], exp = [];
@@ -1576,12 +1687,14 @@ function viewReports() {
   }
   reportState._csv = csv;
   const showAcc = rs.type !== 'balances';
-  return `<div class="page">
+  return `<div class="page ${rs.type === 'year' ? 'wide' : ''}">
     <div class="head"><div class="grow"><h1>Rapporten</h1></div></div>
     <div class="tabs">${REPORTS.map(([k, l]) => `<button data-rtype="${k}" class="${rs.type === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <div class="toolbar">${periodSel} ${showAcc ? accSel : ''}<span class="grow"></span>
+    <div class="toolbar">${rs.type === 'year' ? `<select id="rp-year">${yearsWithData().map(y => `<option ${y === rs.year ? 'selected' : ''}>${y}</option>`).join('')}</select>
+      <label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="rp-subs" ${rs.subs ? 'checked' : ''} style="width:auto;min-height:0"> Subcategorieën tonen</label>
+      <label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="rp-cents" ${rs.cents ? 'checked' : ''} style="width:auto;min-height:0"> Centen tonen</label>` : periodSel} ${showAcc ? accSel : ''}<span class="grow"></span>
       ${csv ? '<button class="btn small" data-act="report-csv">Exporteren naar spreadsheet</button>' : ''}<button class="btn small" data-act="print">Afdrukken</button></div>
-    <div class="card"><h2>${esc(title)} <span class="hint">· ${esc(periodLabel(rs.period, rs.custom))}${showAcc ? ' · ' + esc(accLabel) : ''}</span></h2>${content}</div>
+    <div class="card"><h2>${esc(title)} <span class="hint">· ${rs.type === 'year' ? rs.year : esc(periodLabel(rs.period, rs.custom))}${showAcc ? ' · ' + esc(accLabel) : ''}</span></h2>${content}</div>
   </div>`;
 }
 
@@ -2020,6 +2133,13 @@ function afterRender() {
   if (pf) pf.onchange = () => { reportState.custom.from = pf.value; render(); };
   if (pt) pt.onchange = () => { reportState.custom.to = pt.value; render(); };
   const pa = $('#rp-acc'); if (pa) pa.onchange = () => { reportState.account = pa.value; render(); };
+  const py = $('#rp-year'); if (py) py.onchange = () => { reportState.year = +py.value; render(); };
+  const ps = $('#rp-subs'); if (ps) ps.onchange = () => { reportState.subs = ps.checked; render(); };
+  const pcn = $('#rp-cents'); if (pcn) pcn.onchange = () => { reportState.cents = pcn.checked; render(); };
+  $$('[data-yc]').forEach(td => td.onclick = () => {
+    const [kind, i, m] = td.dataset.yc.split(':'), r = reportState._yearRows[kind][+i];
+    showYearCell(r.label, r.ids, reportState.year, m === '-' ? null : +m);
+  });
   const pc = $('#rp-cat'); if (pc) pc.onchange = () => { reportState.catSel = pc.value ? pc.value.slice(2) : ''; render(); };
   const sc = $('#set-cur'); if (sc) sc.onchange = () => { DB.settings.currency = sc.value; resetFormats(); changed(); render(); };
   const sl = $('#set-loc'); if (sl) sl.onchange = () => { DB.settings.locale = sl.value; resetFormats(); changed(); render(); };
