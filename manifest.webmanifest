@@ -1,7 +1,7 @@
 {
   "name": "Kasboek",
   "short_name": "Kasboek",
-  "description": "Household accounts, transactions and reports. Your data stays on your own computers.",
+  "description": "Huishoudboekje: rekeningen, transacties en rapporten. Uw gegevens blijven op uw eigen computers.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
@@ -9,8 +9,24 @@
   "background_color": "#f6f5f2",
   "theme_color": "#2a78d6",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "lang": "nl"
 }

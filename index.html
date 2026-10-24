@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -212,7 +212,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.3 (October 2026)';
+const APP_VERSION = '1.4 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -226,7 +226,7 @@ if (IS_WEB) {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; if (typeof render === 'function' && state && (state.view === 'settings' || state.view === 'home')) render(); });
-  window.addEventListener('appinstalled', () => { installPrompt = null; toast('Kasboek is installed. From now on, open it from the Dock or the Start menu.'); render(); });
+  window.addEventListener('appinstalled', () => { installPrompt = null; toast('Kasboek is geïnstalleerd. Open het voortaan vanuit het Dock of het Startmenu.'); render(); });
 }
 async function installApp() {
   if (!installPrompt) return;
@@ -245,18 +245,18 @@ const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + pa
 const isoOf = (y, m, d) => y + '-' + pad(m) + '-' + pad(d);
 
 const ACCOUNT_TYPES = [
-  ['checking', 'Current / checking account'],
-  ['savings', 'Savings account'],
-  ['credit', 'Credit card'],
-  ['cash', 'Cash'],
-  ['asset', 'Other asset (house, car…)'],
-  ['liability', 'Loan / mortgage / other debt'],
+  ['checking', 'Betaalrekening'],
+  ['savings', 'Spaarrekening'],
+  ['credit', 'Creditcard'],
+  ['cash', 'Contant geld'],
+  ['asset', 'Overige bezitting (huis, auto…)'],
+  ['liability', 'Lening / hypotheek / overige schuld'],
 ];
 const ACCOUNT_GROUPS = [
-  ['Bank and cash', ['checking', 'savings', 'cash']],
-  ['Credit cards', ['credit']],
-  ['Assets', ['asset']],
-  ['Loans and debts', ['liability']],
+  ['Bank en contant', ['checking', 'savings', 'cash']],
+  ['Creditcards', ['credit']],
+  ['Bezittingen', ['asset']],
+  ['Leningen en schulden', ['liability']],
 ];
 const isDebtType = t => t === 'credit' || t === 'liability';
 
@@ -355,8 +355,8 @@ function parseUserAmount(s) {
 function addMonths(key, n) { let [y, m] = key.split('-').map(Number); m += n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return y + '-' + pad(m); }
 function monthsBetween(fromKey, toKey) { const out = []; let k = fromKey; let guard = 0; while (k <= toKey && guard++ < 1200) { out.push(k); k = addMonths(k, 1); } return out; }
 const PERIODS = [
-  ['thisMonth', 'This month'], ['lastMonth', 'Last month'], ['last3', 'Last 3 months'], ['thisYear', 'This year'],
-  ['lastYear', 'Last year'], ['last12', 'Last 12 months'], ['all', 'All dates'], ['custom', 'Custom dates…'],
+  ['thisMonth', 'Deze maand'], ['lastMonth', 'Vorige maand'], ['last3', 'Laatste 3 maanden'], ['thisYear', 'Dit jaar'],
+  ['lastYear', 'Vorig jaar'], ['last12', 'Laatste 12 maanden'], ['all', 'Alle datums'], ['custom', 'Eigen periode…'],
 ];
 function periodRange(p, custom) {
   const t = todayISO(), y = +t.slice(0, 4), m = +t.slice(5, 7), cur = t.slice(0, 7);
@@ -372,8 +372,8 @@ function periodRange(p, custom) {
   }
 }
 function periodLabel(p, custom) {
-  if (p === 'custom') return (custom.from ? fmtDate(custom.from) : 'start') + ' – ' + (custom.to ? fmtDate(custom.to) : 'today');
-  return (PERIODS.find(x => x[0] === p) || ['', 'All dates'])[1];
+  if (p === 'custom') return (custom.from ? fmtDate(custom.from) : 'begin') + ' – ' + (custom.to ? fmtDate(custom.to) : 'vandaag');
+  return (PERIODS.find(x => x[0] === p) || ['', 'Alle datums'])[1];
 }
 function dataDateRange() {
   let lo = null, hi = null;
@@ -428,7 +428,7 @@ async function saveNow() {
    computers changed things, the changes are combined record by record.
    =================================================================== */
 const fsSupported = typeof window.showOpenFilePicker === 'function' && typeof window.showSaveFilePicker === 'function';
-const FILE_TYPES = [{ description: 'Kasboek data', accept: { 'application/json': ['.json'] } }];
+const FILE_TYPES = [{ description: 'Kasboek-gegevens', accept: { 'application/json': ['.json'] } }];
 const COLLS = ['accounts', 'categories', 'transactions'];
 let fileHandle = null, fileStatus = 'none', fileError = '', baseStr = null, baseMaps = null;
 let lastMod = 0, lastSync = 0, syncing = false, syncAgain = false;
@@ -507,7 +507,7 @@ async function syncFile() {
     let theirs = null;
     if (text.trim()) {
       theirs = JSON.parse(text);
-      if (!theirs || theirs.app !== 'kasboek') throw new Error('This file is not a Kasboek data file.');
+      if (!theirs || theirs.app !== 'kasboek') throw new Error('Dit bestand is geen Kasboek-gegevensbestand.');
     }
     const external = theirs && text !== baseStr;
     const beforeJSON = external ? JSON.stringify([DB.accounts, DB.categories, DB.transactions, DB.settings]) : null;
@@ -524,7 +524,7 @@ async function syncFile() {
       if (JSON.stringify([DB.accounts, DB.categories, DB.transactions, DB.settings]) !== beforeJSON) {
         if (!modalStack.length && document.activeElement && document.activeElement.id !== 'reg-search') render();
         else { renderSide(); }
-        toast('Changes made on the other computer have been added.');
+        toast('Wijzigingen van de andere computer zijn toegevoegd.');
       }
     }
   } catch (e) {
@@ -550,19 +550,19 @@ async function useFileHandle(h) {
 }
 async function createSharedFile() {
   let h;
-  try { h = await window.showSaveFilePicker({ suggestedName: 'Kasboek data.json', types: FILE_TYPES }); } catch (e) { return; }
+  try { h = await window.showSaveFilePicker({ suggestedName: 'Kasboek gegevens.json', types: FILE_TYPES }); } catch (e) { return; }
   baseStr = null; baseMaps = null;
   await useFileHandle(h);
-  if (fileStatus === 'ok') alertBox('Shared data file created', `<p>Kasboek now saves everything in <b>${esc(h.name)}</b>.</p><p>On the other computer, open Kasboek in Chrome or Edge, go to <b>Settings &amp; backup</b> and choose <b>Open existing shared file</b>.</p>`);
+  if (fileStatus === 'ok') alertBox('Gedeeld gegevensbestand gemaakt', `<p>Kasboek bewaart nu alles in <b>${esc(h.name)}</b>.</p><p>Open op de andere computer Kasboek in Chrome of Edge, ga naar <b>Instellingen &amp; reservekopie</b> en kies <b>Bestaand gedeeld bestand openen</b>.</p>`);
 }
 async function openSharedFile() {
   let h;
   try { [h] = await window.showOpenFilePicker({ types: FILE_TYPES, multiple: false }); } catch (e) { return; }
   let theirs;
   try { theirs = JSON.parse(await (await h.getFile()).text()); } catch (e) { theirs = null; }
-  if (!theirs || theirs.app !== 'kasboek') return alertBox('That is not a Kasboek data file', '<p>Choose the file that was created with “Create shared file” on the other computer (usually called <i>Kasboek data.json</i>).</p>');
+  if (!theirs || theirs.app !== 'kasboek') return alertBox('Dat is geen Kasboek-gegevensbestand', '<p>Kies het bestand dat op de andere computer is gemaakt met “Gedeeld bestand maken” (meestal <i>Kasboek gegevens.json</i> of <i>Kasboek data.json</i>).</p>');
   if (DB.transactions.length && !baseStr) {
-    const combine = await confirmBox('Combine with the data on this computer?', `<p>This computer already has <b>${DB.transactions.length.toLocaleString()}</b> transactions, and the shared file has <b>${theirs.transactions.length.toLocaleString()}</b>.</p><p><b>Combine</b> keeps both. <b>Cancel</b>, then use “Erase all data” first, if you only want what is in the shared file.</p>`, 'Combine');
+    const combine = await confirmBox('Samenvoegen met de gegevens op deze computer?', `<p>Deze computer heeft al <b>${DB.transactions.length.toLocaleString('nl-NL')}</b> transacties en het gedeelde bestand <b>${theirs.transactions.length.toLocaleString('nl-NL')}</b>.</p><p><b>Samenvoegen</b> bewaart beide. Wilt u alleen wat in het gedeelde bestand staat, kies dan <b>Annuleren</b> en gebruik eerst “Alle gegevens wissen”.</p>`, 'Samenvoegen');
     if (!combine) return;
   }
   baseStr = null; baseMaps = null;
@@ -575,7 +575,7 @@ async function reconnectFile() {
   } catch (e) { fileStatus = 'error'; fileError = e.message; render(); }
 }
 async function stopSharedFile() {
-  if (!await confirmBox('Stop using the shared file?', '<p>Kasboek will keep a copy of all data on this computer, but changes will no longer be shared with the other computer. The shared file itself is not deleted.</p>', 'Stop sharing')) return;
+  if (!await confirmBox('Stoppen met het gedeelde bestand?', '<p>Kasboek houdt een kopie van alle gegevens op deze computer, maar wijzigingen worden niet meer gedeeld met de andere computer. Het gedeelde bestand zelf wordt niet verwijderd.</p>', 'Stoppen met delen')) return;
   fileHandle = null; fileStatus = 'none'; baseStr = null; baseMaps = null;
   if (idbHandle) { await idbDel('fh'); await idbDel('base'); }
   render();
@@ -585,16 +585,16 @@ async function mergeOtherFile() {
   try { [h] = await window.showOpenFilePicker({ types: FILE_TYPES, multiple: false }); } catch (e) { return; }
   let other;
   try { other = JSON.parse(await (await h.getFile()).text()); } catch (e) { other = null; }
-  if (!other || other.app !== 'kasboek') return alertBox('That is not a Kasboek file', '<p>Choose a Kasboek data or backup file.</p>');
+  if (!other || other.app !== 'kasboek') return alertBox('Dat is geen Kasboek-bestand', '<p>Kies een Kasboek-gegevensbestand of een reservekopie.</p>');
   stampChanges();
   const n0 = DB.transactions.length;
   DB = mergeDB(DB, other); repairLinks(); changed(); render();
-  alertBox('Files combined', `<p>${(DB.transactions.length - n0).toLocaleString()} transactions were added from <b>${esc(h.name)}</b>. Changes to existing transactions were combined, keeping the most recent version of each.</p>`);
+  alertBox('Bestanden samengevoegd', `<p>Er zijn ${(DB.transactions.length - n0).toLocaleString('nl-NL')} transacties toegevoegd uit <b>${esc(h.name)}</b>. Wijzigingen in bestaande transacties zijn samengevoegd; van elke transactie is de nieuwste versie bewaard.</p>`);
 }
 function fileBanner() {
   if (!fileHandle) return '';
-  if (fileStatus === 'needs-permission') return `<div class="banner"><span class="grow"><b>Open the shared data file to continue.</b> For your privacy the browser asks once each time Kasboek starts. File: ${esc(fileHandle.name)}</span><button class="btn small primary" data-act="fs-reconnect">Open shared file</button></div>`;
-  if (fileStatus === 'error') return `<div class="banner"><span class="grow"><b>The shared data file could not be reached.</b> ${esc(fileError)} Your changes are kept on this computer and will be added to the file once it is reachable again.</span><button class="btn small" data-act="fs-sync">Try again</button><button class="btn small" data-act="fs-open">Choose the file again…</button></div>`;
+  if (fileStatus === 'needs-permission') return `<div class="banner"><span class="grow"><b>Open het gedeelde gegevensbestand om verder te gaan.</b> Voor uw privacy vraagt de browser dit één keer bij elke start van Kasboek. Bestand: ${esc(fileHandle.name)}</span><button class="btn small primary" data-act="fs-reconnect">Gedeeld bestand openen</button></div>`;
+  if (fileStatus === 'error') return `<div class="banner"><span class="grow"><b>Het gedeelde gegevensbestand is niet bereikbaar.</b> ${esc(fileError)} Uw wijzigingen blijven op deze computer bewaard en worden aan het bestand toegevoegd zodra het weer bereikbaar is.</span><button class="btn small" data-act="fs-sync">Opnieuw proberen</button><button class="btn small" data-act="fs-open">Bestand opnieuw kiezen…</button></div>`;
   return '';
 }
 window.addEventListener('beforeunload', e => { if (saveState === 'saving') { saveNow(); } });
@@ -602,12 +602,12 @@ function updateSaveStatus() {
   const el = $('#savestatus'); if (!el) return;
   if (fileHandle) {
     const t = lastSync ? new Date(lastSync).toLocaleTimeString(DB.settings.locale, { hour: '2-digit', minute: '2-digit' }) : '';
-    el.textContent = fileStatus === 'ok' ? (syncing || saveState === 'saving' ? 'Saving to shared file…' : `Shared file “${fileHandle.name}” · up to date${t ? ' at ' + t : ''}`)
-      : fileStatus === 'needs-permission' ? 'Shared file not opened yet' : 'Shared file not reachable — changes kept on this computer';
+    el.textContent = fileStatus === 'ok' ? (syncing || saveState === 'saving' ? 'Opslaan in gedeeld bestand…' : `Gedeeld bestand “${fileHandle.name}” · bijgewerkt${t ? ' om ' + t : ''}`)
+      : fileStatus === 'needs-permission' ? 'Gedeeld bestand nog niet geopend' : 'Gedeeld bestand niet bereikbaar — wijzigingen staan op deze computer';
     el.style.color = fileStatus === 'ok' ? '' : 'var(--neg)';
     return;
   }
-  el.textContent = saveState === 'saved' ? 'All changes saved on this computer' : saveState === 'saving' ? 'Saving…' : 'Could not save — please use “Save backup file”';
+  el.textContent = saveState === 'saved' ? 'Alle wijzigingen zijn op deze computer opgeslagen' : saveState === 'saving' ? 'Opslaan…' : 'Opslaan mislukt — gebruik “Reservekopie opslaan”';
   el.style.color = saveState === 'failed' ? 'var(--neg)' : '';
 }
 function download(name, text, mime) {
@@ -619,21 +619,21 @@ function download(name, text, mime) {
 }
 function saveBackup() {
   DB.lastBackup = new Date().toISOString();
-  download('Kasboek backup ' + todayISO() + '.json', JSON.stringify(DB, null, 1), 'application/json');
+  download('Kasboek reservekopie ' + todayISO() + '.json', JSON.stringify(DB, null, 1), 'application/json');
   changed(); render();
-  toast('Backup file saved to your Downloads folder.');
+  toast('Reservekopie opgeslagen in uw map Downloads.');
 }
 function openBackup() { $('#file-backup').value = ''; $('#file-backup').click(); }
 $('#file-backup').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
   let d;
-  try { d = JSON.parse(await f.text()); } catch (err) { return alertBox('That file could not be read', 'It does not look like a Kasboek backup file.'); }
-  if (!d || d.app !== 'kasboek' || !Array.isArray(d.transactions)) return alertBox('That file could not be read', 'It does not look like a Kasboek backup file.');
-  const ok = await confirmBox('Open this backup?', `<p>The backup contains <b>${d.accounts.length}</b> accounts and <b>${d.transactions.length.toLocaleString()}</b> transactions.</p><p>It will <b>replace</b> everything currently in Kasboek. If you are unsure, save a backup of the current data first.</p>`, 'Replace with backup', true);
+  try { d = JSON.parse(await f.text()); } catch (err) { return alertBox('Dat bestand kan niet worden gelezen', 'Het lijkt geen reservekopie van Kasboek te zijn.'); }
+  if (!d || d.app !== 'kasboek' || !Array.isArray(d.transactions)) return alertBox('Dat bestand kan niet worden gelezen', 'Het lijkt geen reservekopie van Kasboek te zijn.');
+  const ok = await confirmBox('Deze reservekopie openen?', `<p>De reservekopie bevat <b>${d.accounts.length}</b> rekeningen en <b>${d.transactions.length.toLocaleString('nl-NL')}</b> transacties.</p><p>Hij <b>vervangt</b> alles wat nu in Kasboek staat. Twijfelt u, sla dan eerst een reservekopie van de huidige gegevens op.</p>`, 'Vervangen door reservekopie', true);
   if (!ok) return;
   DB = Object.assign(emptyDB(), d); DB.settings = Object.assign(emptyDB().settings, d.settings || {});
   resetFormats(); applyTheme(); changed(); state = { view: 'home' }; render();
-  toast('Backup opened.');
+  toast('Reservekopie geopend.');
 });
 
 /* ---------- categories ---------- */
@@ -671,8 +671,8 @@ function sortedTopCats(kind) { return DB.categories.filter(c => !c.parentId && (
 /* options for a category <select>; values: "" | c:<id> | t:<accountId> | __new */
 function catOptions(selected, excludeAccountId, opts = {}) {
   const I = idx();
-  let h = `<option value="">${opts.noneLabel || '— No category —'}</option>`;
-  for (const [kind, label] of [['expense', 'Expenses'], ['income', 'Income']]) {
+  let h = `<option value="">${opts.noneLabel || '— Geen categorie —'}</option>`;
+  for (const [kind, label] of [['expense', 'Uitgaven'], ['income', 'Inkomsten']]) {
     const tops = sortedTopCats(kind);
     if (!tops.length) continue;
     h += `<optgroup label="${label}">`;
@@ -685,12 +685,12 @@ function catOptions(selected, excludeAccountId, opts = {}) {
   if (!opts.noTransfers) {
     const accs = DB.accounts.filter(a => a.id !== excludeAccountId && (!a.closed || selected === 't:' + a.id));
     if (accs.length) {
-      h += `<optgroup label="Transfer to / from account">`;
+      h += `<optgroup label="Overboeken naar / van rekening">`;
       for (const a of accs) h += `<option value="t:${a.id}" ${selected === 't:' + a.id ? 'selected' : ''}>↔ ${esc(a.name)}</option>`;
       h += `</optgroup>`;
     }
   }
-  if (!opts.noNew) h += `<option value="__new">+ New category…</option>`;
+  if (!opts.noNew) h += `<option value="__new">+ Nieuwe categorie…</option>`;
   return h;
 }
 
@@ -722,12 +722,12 @@ function deleteTx(src) {
 }
 function txCategoryLabel(t) {
   const I = idx();
-  if (t.ob) return '<span class="muted">Opening balance</span>';
-  if (t.linkId) { const s = I.tx.get(t.linkId); const a = s && I.acc.get(s.accountId); return '↔ ' + esc(a ? a.name : 'other account'); }
-  if (t.splits && t.splits.length) return `Split (${t.splits.length} lines)`;
-  if (t.transferAccountId) { const a = I.acc.get(t.transferAccountId); return '↔ ' + esc(a ? a.name : 'other account'); }
+  if (t.ob) return '<span class="muted">Beginsaldo</span>';
+  if (t.linkId) { const s = I.tx.get(t.linkId); const a = s && I.acc.get(s.accountId); return '↔ ' + esc(a ? a.name : 'andere rekening'); }
+  if (t.splits && t.splits.length) return `Gesplitst (${t.splits.length} regels)`;
+  if (t.transferAccountId) { const a = I.acc.get(t.transferAccountId); return '↔ ' + esc(a ? a.name : 'andere rekening'); }
   if (t.categoryId) return esc(catName(t.categoryId));
-  return '<span class="muted">Uncategorized</span>';
+  return '<span class="muted">Zonder categorie</span>';
 }
 function txCategoryText(t) { const d = document.createElement('div'); d.innerHTML = txCategoryLabel(t); return d.textContent; }
 function accName(id) { const a = idx().acc.get(id); return a ? a.name : ''; }
@@ -769,7 +769,7 @@ function renderSide() {
   const I = idx();
   const on = (v, id) => (state.view === v && (!id || state.accountId === id)) ? ' on' : '';
   let h = `<div class="brand"><svg width="26" height="26" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M9 21V11M9 16l7-5M9 16l7 5M19 21h5M19 16h5M19 11h5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><span class="t">Kasboek</span></div>
-  <button class="nav${on('home')}" data-go="home">${ICONS.home}<span class="nm">Home</span></button>`;
+  <button class="nav${on('home')}" data-go="home">${ICONS.home}<span class="nm">Overzicht</span></button>`;
   for (const [label, types] of ACCOUNT_GROUPS) {
     const accs = DB.accounts.filter(a => types.includes(a.type) && !a.closed).sort((a, b) => a.name.localeCompare(b.name));
     if (!accs.length) continue;
@@ -778,15 +778,15 @@ function renderSide() {
   }
   const closed = DB.accounts.filter(a => a.closed).sort((a, b) => a.name.localeCompare(b.name));
   if (closed.length) {
-    h += `<h3>Closed accounts</h3>`;
+    h += `<h3>Opgeheven rekeningen</h3>`;
     for (const a of closed) h += `<button class="nav${on('account', a.id)}" data-acc="${a.id}">${ICONS.acct}<span class="nm muted">${esc(a.name)}</span></button>`;
   }
-  h += `<button class="nav addacc" data-act="add-account" style="margin-top:6px">+ Add account</button>
-  <h3>Tools</h3>
-  <button class="nav${on('reports')}" data-go="reports">${ICONS.reports}<span class="nm">Reports</span></button>
-  <button class="nav${on('categories')}" data-go="categories">${ICONS.cats}<span class="nm">Categories</span></button>
-  <button class="nav${on('import')}" data-go="import">${ICONS.import}<span class="nm">Import from Money</span></button>
-  <button class="nav${on('settings')}" data-go="settings">${ICONS.settings}<span class="nm">Settings &amp; backup</span></button>
+  h += `<button class="nav addacc" data-act="add-account" style="margin-top:6px">+ Rekening toevoegen</button>
+  <h3>Extra</h3>
+  <button class="nav${on('reports')}" data-go="reports">${ICONS.reports}<span class="nm">Rapporten</span></button>
+  <button class="nav${on('categories')}" data-go="categories">${ICONS.cats}<span class="nm">Categorieën</span></button>
+  <button class="nav${on('import')}" data-go="import">${ICONS.import}<span class="nm">Importeren uit Money</span></button>
+  <button class="nav${on('settings')}" data-go="settings">${ICONS.settings}<span class="nm">Instellingen &amp; reservekopie</span></button>
   <div class="foot"><span id="savestatus" class="status-saved"></span></div>`;
   $('#side').innerHTML = h;
 }
@@ -794,15 +794,15 @@ function renderSide() {
 /* ---------- Welcome & Home ---------- */
 function viewWelcome() {
   return `<div class="page"><div class="welcome">
-    <h1>Welcome to Kasboek</h1>
-    <p class="sub">Your accounts, transactions and reports, kept privately on this computer.</p>
+    <h1>Welkom bij Kasboek</h1>
+    <p class="sub">Uw rekeningen, transacties en rapporten, privé bewaard op deze computer.</p>
     <div class="big">
-      ${installPrompt && !isInstalledApp() ? `<button class="bigbtn" data-act="install" style="border-color:var(--accent)"><b>Install Kasboek on this computer</b><span>Gives Kasboek its own icon in the Dock or Start menu and its own window.</span></button>` : ''}
-      ${fsSupported && !fileHandle ? `<button class="bigbtn" data-act="fs-open"><b>Open our shared data file</b><span>Kasboek is already set up on another computer? Choose the shared file (for example “Kasboek data.json”) to work in the same data.</span></button>` : ''}
-      <button class="bigbtn" data-go="import"><b>Bring in my Microsoft Money data</b><span>Import the QIF files exported from Money. Your accounts, categories and transfers are recreated.</span></button>
-      <button class="bigbtn" data-act="add-account"><b>Start with a new account</b><span>Enter an account name and its current balance, then add transactions.</span></button>
-      <button class="bigbtn" data-act="open-backup"><b>Open a Kasboek backup file</b><span>Continue where you left off on another computer.</span></button>
-      <button class="bigbtn" data-act="sample"><b>Look around with example data</b><span>Two years of made-up transactions. You can erase it later under Settings.</span></button>
+      ${installPrompt && !isInstalledApp() ? `<button class="bigbtn" data-act="install" style="border-color:var(--accent)"><b>Kasboek installeren op deze computer</b><span>Kasboek krijgt een eigen pictogram in het Dock of Startmenu en een eigen venster.</span></button>` : ''}
+      ${fsSupported && !fileHandle ? `<button class="bigbtn" data-act="fs-open"><b>Ons gedeelde gegevensbestand openen</b><span>Is Kasboek al ingesteld op een andere computer? Kies het gedeelde bestand (bijvoorbeeld “Kasboek gegevens.json”) om in dezelfde gegevens te werken.</span></button>` : ''}
+      <button class="bigbtn" data-go="import"><b>Mijn gegevens uit Microsoft Money overnemen</b><span>Importeer de QIF-bestanden die u uit Money hebt geëxporteerd. Uw rekeningen, categorieën en overboekingen worden opnieuw aangemaakt.</span></button>
+      <button class="bigbtn" data-act="add-account"><b>Beginnen met een nieuwe rekening</b><span>Voer de naam en het huidige saldo van een rekening in en voeg daarna transacties toe.</span></button>
+      <button class="bigbtn" data-act="open-backup"><b>Een reservekopie van Kasboek openen</b><span>Ga verder waar u op een andere computer was gebleven.</span></button>
+      <button class="bigbtn" data-act="sample"><b>Rondkijken met voorbeeldgegevens</b><span>Twee jaar verzonnen transacties. U kunt ze later wissen onder Instellingen.</span></button>
     </div>
   </div></div>`;
 }
@@ -812,7 +812,7 @@ function backupBanner() {
   const last = DB.lastBackup ? new Date(DB.lastBackup) : null;
   const days = last ? Math.floor((Date.now() - last) / 864e5) : null;
   if (last && days < 14) return '';
-  return `<div class="banner"><span class="grow"><b>${last ? `Your last backup file is ${days} days old.` : 'You have not saved a backup file yet.'}</b> Kasboek keeps your data in this browser; a backup file protects it if the browser is reset or the computer is replaced.</span><button class="btn small" data-act="save-backup">Save backup file</button></div>`;
+  return `<div class="banner"><span class="grow"><b>${last ? `Uw laatste reservekopie is ${days} dagen oud.` : 'U hebt nog geen reservekopie opgeslagen.'}</b> Kasboek bewaart uw gegevens in deze browser; een reservekopie beschermt ze als de browser wordt gewist of de computer wordt vervangen.</span><button class="btn small" data-act="save-backup">Reservekopie opslaan</button></div>`;
 }
 
 function categoryFlows(from, to, accountId) {
@@ -847,30 +847,30 @@ function viewHome() {
     const tot = accs.reduce((s, a) => s + (I.bal.get(a.id) || 0), 0);
     accHTML += `<tr><td colspan="2" style="padding-top:14px" class="muted"><b>${label}</b></td></tr>`;
     for (const a of accs) accHTML += `<tr class="click" data-acc="${a.id}"><td>${esc(a.name)}</td><td class="num">${moneyHTML(I.bal.get(a.id) || 0)}</td></tr>`;
-    if (accs.length > 1) accHTML += `<tr><td class="muted">Total ${label.toLowerCase()}</td><td class="num muted">${esc(money(tot))}</td></tr>`;
+    if (accs.length > 1) accHTML += `<tr><td class="muted">Totaal ${label.toLowerCase()}</td><td class="num muted">${esc(money(tot))}</td></tr>`;
   }
   const recent = DB.transactions.filter(t => !t.linkId).sort(cmpTx).slice(-8).reverse();
   return `<div class="page">
     ${backupBanner()}
-    <div class="head"><div class="grow"><div class="sub">Net worth</div><div class="hero ${net < 0 ? 'neg' : ''}">${esc(money(net))}</div></div>
-      <button class="btn primary" data-act="new-tx-any">+ New transaction</button></div>
+    <div class="head"><div class="grow"><div class="sub">Vermogen</div><div class="hero ${net < 0 ? 'neg' : ''}">${esc(money(net))}</div></div>
+      <button class="btn primary" data-act="new-tx-any">+ Nieuwe transactie</button></div>
     <div class="cols2">
-      <div class="card"><h2>Accounts</h2><table class="t">${accHTML}</table></div>
-      <div class="card"><h2>This month</h2>
+      <div class="card"><h2>Rekeningen</h2><table class="t">${accHTML}</table></div>
+      <div class="card"><h2>Deze maand</h2>
         <div class="tiles">
-          <div class="tile"><div class="k">Income</div><div class="v">${esc(money(income))}</div></div>
-          <div class="tile"><div class="k">Spending</div><div class="v">${esc(money(expense))}</div></div>
-          <div class="tile"><div class="k">Difference</div><div class="v ${income - expense < 0 ? 'neg' : ''}">${esc(money(income - expense))}</div></div>
+          <div class="tile"><div class="k">Inkomsten</div><div class="v">${esc(money(income))}</div></div>
+          <div class="tile"><div class="k">Uitgaven</div><div class="v">${esc(money(expense))}</div></div>
+          <div class="tile"><div class="k">Verschil</div><div class="v ${income - expense < 0 ? 'neg' : ''}">${esc(money(income - expense))}</div></div>
         </div>
-        <h2 style="margin-top:18px">Where the money went</h2>
-        ${spend.length ? hbarsHTML(spend, false) : '<p class="muted">No spending recorded this month yet.</p>'}
-        <div style="margin-top:10px"><button class="btn link" data-go="reports">Open reports →</button></div>
+        <h2 style="margin-top:18px">Waar het geld heen ging</h2>
+        ${spend.length ? hbarsHTML(spend, false) : '<p class="muted">Deze maand zijn nog geen uitgaven geboekt.</p>'}
+        <div style="margin-top:10px"><button class="btn link" data-go="reports">Naar de rapporten →</button></div>
       </div>
     </div>
-    <div class="card" style="margin-top:16px"><h2>Latest transactions</h2>
-      ${recent.length ? `<table class="t"><thead><tr><th>Date</th><th>Account</th><th>Payee</th><th>Category</th><th class="num">Amount</th></tr></thead><tbody>
+    <div class="card" style="margin-top:16px"><h2>Laatste transacties</h2>
+      ${recent.length ? `<table class="t"><thead><tr><th>Datum</th><th>Rekening</th><th>Begunstigde</th><th>Categorie</th><th class="num">Bedrag</th></tr></thead><tbody>
       ${recent.map(t => `<tr class="click" data-acc="${t.accountId}"><td>${fmtDate(t.date)}</td><td>${esc(accName(t.accountId))}</td><td>${esc(t.payee)}</td><td class="cat">${txCategoryLabel(t)}</td><td class="num">${moneyHTML(t.amount)}</td></tr>`).join('')}
-      </tbody></table>` : '<p class="muted">No transactions yet.</p>'}
+      </tbody></table>` : '<p class="muted">Nog geen transacties.</p>'}
     </div>
   </div>`;
 }
@@ -894,15 +894,15 @@ function viewRegister() {
     const cleared = opening + all.filter(t => recon.checked.has(t.id)).reduce((s, t) => s + t.amount, 0);
     const diff = recon.ending - cleared;
     reconHTML = `<div class="recon">
-      <div><div class="k">Statement date</div><div class="v">${fmtDate(recon.date)}</div></div>
-      <div><div class="k">Statement balance</div><div class="v">${esc(money(recon.ending))}</div></div>
-      <div><div class="k">Ticked off so far</div><div class="v">${esc(money(cleared))}</div></div>
-      <div><div class="k">Difference</div><div class="v ${diff ? 'neg' : ''}">${esc(money(diff))}</div></div>
+      <div><div class="k">Datum afschrift</div><div class="v">${fmtDate(recon.date)}</div></div>
+      <div><div class="k">Saldo afschrift</div><div class="v">${esc(money(recon.ending))}</div></div>
+      <div><div class="k">Tot nu toe afgevinkt</div><div class="v">${esc(money(cleared))}</div></div>
+      <div><div class="k">Verschil</div><div class="v ${diff ? 'neg' : ''}">${esc(money(diff))}</div></div>
       <span class="spacer"></span>
-      ${diff === 0 ? '<button class="btn primary" data-act="recon-finish">Finish — it balances</button>' : '<button class="btn" data-act="recon-adjust">Finish with adjustment…</button>'}
-      <button class="btn" data-act="recon-postpone">Postpone</button>
-      <button class="btn" data-act="recon-cancel">Cancel</button>
-      <div style="flex-basis:100%;font-size:13px;color:var(--ink-2)">Tick every transaction that appears on your statement. When the difference is ${esc(money(0))}, click Finish.</div>
+      ${diff === 0 ? '<button class="btn primary" data-act="recon-finish">Afronden — het klopt</button>' : '<button class="btn" data-act="recon-adjust">Afronden met correctie…</button>'}
+      <button class="btn" data-act="recon-postpone">Later verdergaan</button>
+      <button class="btn" data-act="recon-cancel">Annuleren</button>
+      <div style="flex-basis:100%;font-size:13px;color:var(--ink-2)">Vink elke transactie aan die op uw afschrift staat. Is het verschil ${esc(money(0))}, klik dan op Afronden.</div>
     </div>`;
   } else {
     const [from, to] = periodRange(regState.period, regState.custom);
@@ -916,8 +916,8 @@ function viewRegister() {
   const body = shown.map(t => {
     const st = t.status || '';
     const stCell = inRecon
-      ? `<input type="checkbox" data-recon="${t.id}" ${recon.checked.has(t.id) ? 'checked' : ''} aria-label="Ticked">`
-      : `<button class="stbtn ${st}" data-status="${t.id}" title="${st === 'R' ? 'Reconciled' : st === 'c' ? 'Cleared — click to unmark' : 'Not cleared — click to mark as cleared'}">${st === 'R' ? 'R' : st === 'c' ? 'c' : '·'}</button>`;
+      ? `<input type="checkbox" data-recon="${t.id}" ${recon.checked.has(t.id) ? 'checked' : ''} aria-label="Afgevinkt">`
+      : `<button class="stbtn ${st}" data-status="${t.id}" title="${st === 'R' ? 'Afgestemd' : st === 'c' ? 'Verwerkt door de bank — klik om dit ongedaan te maken' : 'Nog niet verwerkt — klik om te markeren als verwerkt door de bank'}">${st === 'R' ? 'R' : st === 'c' ? 'c' : '·'}</button>`;
     return `<tr class="click" data-tx="${t.id}">
       <td class="st">${stCell}</td>
       <td style="white-space:nowrap">${fmtDate(t.date)}</td>
@@ -932,25 +932,25 @@ function viewRegister() {
   const typeLabel = (ACCOUNT_TYPES.find(x => x[0] === a.type) || ['', ''])[1];
   return `<div class="page">
     <div class="head">
-      <div class="grow"><h1>${esc(a.name)}${a.closed ? ' <span class="pill">closed</span>' : ''}</h1>
-        <p class="sub">${esc(typeLabel)} · Balance <b class="${bal < 0 ? 'neg' : ''}">${esc(money(bal))}</b> · Cleared ${esc(money(clearedBal))}${debt && bal < 0 ? ` · You owe ${esc(money(-bal))}` : ''}</p></div>
-      <button class="btn" data-act="edit-account">Account details</button>
-      ${inRecon ? '' : '<button class="btn" data-act="recon-start">Reconcile…</button>'}
-      <button class="btn primary" data-act="new-tx">+ New transaction</button>
+      <div class="grow"><h1>${esc(a.name)}${a.closed ? ' <span class="pill">opgeheven</span>' : ''}</h1>
+        <p class="sub">${esc(typeLabel)} · Saldo <b class="${bal < 0 ? 'neg' : ''}">${esc(money(bal))}</b> · Verwerkt door de bank ${esc(money(clearedBal))}${debt && bal < 0 ? ` · U bent verschuldigd ${esc(money(-bal))}` : ''}</p></div>
+      <button class="btn" data-act="edit-account">Rekeninggegevens</button>
+      ${inRecon ? '' : '<button class="btn" data-act="recon-start">Afstemmen…</button>'}
+      <button class="btn primary" data-act="new-tx">+ Nieuwe transactie</button>
     </div>
     ${reconHTML}
     ${inRecon ? '' : `<div class="toolbar">
-      <input type="search" id="reg-search" placeholder="Search payee, memo, category, amount…" value="${esc(regState.search)}">
+      <input type="search" id="reg-search" placeholder="Zoek op begunstigde, notitie, categorie, bedrag…" value="${esc(regState.search)}">
       <select id="reg-period">${PERIODS.map(([k, l]) => `<option value="${k}" ${regState.period === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
-      ${regState.period === 'custom' ? `<input type="date" id="reg-from" value="${esc((regState.custom || {}).from || '')}"> to <input type="date" id="reg-to" value="${esc((regState.custom || {}).to || '')}">` : ''}
+      ${regState.period === 'custom' ? `<input type="date" id="reg-from" value="${esc((regState.custom || {}).from || '')}"> t/m <input type="date" id="reg-to" value="${esc((regState.custom || {}).to || '')}">` : ''}
       <span class="grow"></span>
-      <span class="muted" style="font-size:13px">${rows.length.toLocaleString()} transaction${rows.length === 1 ? '' : 's'}</span>
-      <button class="btn small" data-act="reg-csv">Export to spreadsheet</button>
+      <span class="muted" style="font-size:13px">${rows.length.toLocaleString('nl-NL')} transactie${rows.length === 1 ? '' : 's'}</span>
+      <button class="btn small" data-act="reg-csv">Exporteren naar spreadsheet</button>
     </div>`}
     <div class="card" style="padding:4px 6px">
-    ${rows.length ? `<table class="t reg"><thead><tr><th class="st" title="Status">${inRecon ? '✓' : 'C'}</th><th>Date</th><th class="numcol">Num</th><th>Payee / memo</th><th>Category</th><th class="num">Payment</th><th class="num">Deposit</th>${inRecon ? '' : '<th class="num">Balance</th>'}</tr></thead><tbody>${body}</tbody></table>
-      ${rows.length > shown.length ? `<div class="more"><button class="btn" data-act="show-more">Show older transactions (${(rows.length - shown.length).toLocaleString()} more)</button></div>` : ''}`
-    : `<p class="muted" style="padding:18px">${all.length ? 'No transactions match.' : 'No transactions yet. Click “New transaction” to add one.'}</p>`}
+    ${rows.length ? `<table class="t reg"><thead><tr><th class="st" title="Status">${inRecon ? '✓' : 'C'}</th><th>Datum</th><th class="numcol">Nr.</th><th>Begunstigde / notitie</th><th>Categorie</th><th class="num">Af</th><th class="num">Bij</th>${inRecon ? '' : '<th class="num">Saldo</th>'}</tr></thead><tbody>${body}</tbody></table>
+      ${rows.length > shown.length ? `<div class="more"><button class="btn" data-act="show-more">Oudere transacties tonen (nog ${(rows.length - shown.length).toLocaleString('nl-NL')})</button></div>` : ''}`
+    : `<p class="muted" style="padding:18px">${all.length ? 'Geen transacties gevonden.' : 'Nog geen transacties. Klik op “Nieuwe transactie” om er een toe te voegen.'}</p>`}
     </div>
   </div>`;
 }
@@ -959,7 +959,7 @@ function exportRegisterCSV() {
   const I = idx(), a = I.acc.get(state.accountId); if (!a) return;
   const all = I.byAcc.get(a.id) || [];
   let run = 0;
-  const rows = [['Date', 'Number', 'Payee', 'Category', 'Memo', 'Status', 'Amount', 'Balance']];
+  const rows = [['Datum', 'Nummer', 'Begunstigde', 'Categorie', 'Notitie', 'Status', 'Bedrag', 'Saldo']];
   const [from, to] = periodRange(regState.period, regState.custom);
   for (const t of all) {
     run += t.amount;
@@ -979,7 +979,7 @@ let modalStack = [];
 function openModal({ title, body, wide }) {
   const w = document.createElement('div');
   w.className = 'modal-wrap';
-  w.innerHTML = `<div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true"><div class="modal-head"><h2>${title}</h2><button class="icon-btn" data-close aria-label="Close">×</button></div><div class="modal-body">${body}</div></div>`;
+  w.innerHTML = `<div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true"><div class="modal-head"><h2>${title}</h2><button class="icon-btn" data-close aria-label="Sluiten">×</button></div><div class="modal-body">${body}</div></div>`;
   document.body.appendChild(w);
   w.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeModal(w); });
   modalStack.push(w);
@@ -990,7 +990,7 @@ function closeModal(w) { w.remove(); modalStack = modalStack.filter(x => x !== w
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalStack.length) closeModal(modalStack[modalStack.length - 1]); });
 function confirmBox(title, html, okLabel, danger) {
   return new Promise(res => {
-    const w = openModal({ title: esc(title), body: `<div>${html}</div><div class="modal-actions"><span class="spacer"></span><button class="btn" data-no>Cancel</button><button class="btn ${danger ? 'danger' : 'primary'}" data-yes>${esc(okLabel || 'OK')}</button></div>` });
+    const w = openModal({ title: esc(title), body: `<div>${html}</div><div class="modal-actions"><span class="spacer"></span><button class="btn" data-no>Annuleren</button><button class="btn ${danger ? 'danger' : 'primary'}" data-yes>${esc(okLabel || 'OK')}</button></div>` });
     $('[data-yes]', w).onclick = () => { closeModal(w); res(true); };
     $('[data-no]', w).onclick = () => { closeModal(w); res(false); };
     $('.icon-btn', w).addEventListener('click', () => res(false));
@@ -1003,7 +1003,7 @@ function alertBox(title, html) {
 }
 function promptBox(title, label, value, hint) {
   return new Promise(res => {
-    const w = openModal({ title: esc(title), body: `<form><label>${esc(label)}${hint ? ` <span class="hint">${esc(hint)}</span>` : ''}<input name="v" value="${esc(value || '')}" autofocus></label><div class="modal-actions"><span class="spacer"></span><button type="button" class="btn" data-no>Cancel</button><button class="btn primary">OK</button></div></form>` });
+    const w = openModal({ title: esc(title), body: `<form><label>${esc(label)}${hint ? ` <span class="hint">${esc(hint)}</span>` : ''}<input name="v" value="${esc(value || '')}" autofocus></label><div class="modal-actions"><span class="spacer"></span><button type="button" class="btn" data-no>Annuleren</button><button class="btn primary">OK</button></div></form>` });
     const f = $('form', w);
     f.onsubmit = e => { e.preventDefault(); const v = f.v.value.trim(); closeModal(w); res(v || null); };
     $('[data-no]', w).onclick = () => { closeModal(w); res(null); };
@@ -1043,47 +1043,47 @@ function openTxEditor(tx, accountId, startType) {
   $('#payee-list').innerHTML = Array.from(I.payeeLast.values()).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3000).map(t => `<option value="${esc(t.payee)}">`).join('');
 
   const body = `
-    ${fromLeg && type !== 'xfer' ? `<div class="note">This is the other side of a transfer entered in <b>${esc(acc.name)}</b>. It is shown here as it appears in ${esc(acc.name)}; changes apply to both accounts.</div>` : ''}
-    ${d.ob ? `<div class="note">This is the opening balance of the account.</div>` : ''}
+    ${fromLeg && type !== 'xfer' ? `<div class="note">Dit is de andere kant van een overboeking die is ingevoerd bij <b>${esc(acc.name)}</b>. Hij wordt hier getoond zoals hij bij ${esc(acc.name)} staat; wijzigingen gelden voor beide rekeningen.</div>` : ''}
+    ${d.ob ? `<div class="note">Dit is het beginsaldo van de rekening.</div>` : ''}
     <form id="txf" autocomplete="off">
-      <div class="seg"><button type="button" data-type="pay">Expense (money out)</button><button type="button" data-type="dep">Deposit (money in)</button>${d.ob ? '' : '<button type="button" data-type="xfer">Transfer (between accounts)</button>'}</div>
+      <div class="seg"><button type="button" data-type="pay">Uitgave (af)</button><button type="button" data-type="dep">Ontvangst (bij)</button>${d.ob ? '' : '<button type="button" data-type="xfer">Overboeking (tussen rekeningen)</button>'}</div>
       <div class="grid2">
-        <label>Date<input type="date" name="date" value="${esc(d.date)}" required></label>
-        <label>Number <span class="hint">optional (cheque, reference)</span><input name="num" value="${esc(d.num)}"></label>
+        <label>Datum<input type="date" name="date" value="${esc(d.date)}" required></label>
+        <label>Nummer <span class="hint">optioneel (kenmerk, referentie)</span><input name="num" value="${esc(d.num)}"></label>
       </div>
       <div id="xfer-area"></div>
-      <label><span id="payee-label">Payee</span><input name="payee" list="payee-list" value="${esc(d.payee)}" ${isNew ? 'autofocus' : ''} placeholder="Who did you pay, or who paid you?"></label>
-      <label>Amount<input name="amount" inputmode="decimal" value="${d.amount != null ? esc(moneyPlain(Math.abs(d.amount))) : ''}" placeholder="0${localeDecimal()}00"></label>
+      <label><span id="payee-label">Begunstigde</span><input name="payee" list="payee-list" value="${esc(d.payee)}" ${isNew ? 'autofocus' : ''} placeholder="Aan wie betaalde u, of wie betaalde u?"></label>
+      <label>Bedrag<input name="amount" inputmode="decimal" value="${d.amount != null ? esc(moneyPlain(Math.abs(d.amount))) : ''}" placeholder="0${localeDecimal()}00"></label>
       <div id="cat-area"></div>
-      <label>Memo <span class="hint">optional</span><input name="memo" value="${esc(d.memo)}"></label>
+      <label>Notitie <span class="hint">optioneel</span><input name="memo" value="${esc(d.memo)}"></label>
       <label>Status<select name="status">
-        <option value="" ${!d.status ? 'selected' : ''}>Not cleared</option>
-        <option value="c" ${d.status === 'c' ? 'selected' : ''}>Cleared (appears at the bank)</option>
-        <option value="R" ${d.status === 'R' ? 'selected' : ''}>Reconciled</option></select></label>
+        <option value="" ${!d.status ? 'selected' : ''}>Nog niet verwerkt</option>
+        <option value="c" ${d.status === 'c' ? 'selected' : ''}>Verwerkt door de bank (staat op het afschrift)</option>
+        <option value="R" ${d.status === 'R' ? 'selected' : ''}>Afgestemd</option></select></label>
       <div class="err" id="txerr"></div>
       <div class="modal-actions">
-        ${!isNew ? '<button type="button" class="btn danger" data-del>Delete</button>' : ''}
+        ${!isNew ? '<button type="button" class="btn danger" data-del>Verwijderen</button>' : ''}
         <span class="spacer"></span>
-        <button type="button" class="btn" data-close>Cancel</button>
-        ${isNew ? '<button type="button" class="btn" data-savenew>Save and add another</button>' : ''}
-        <button type="submit" class="btn primary">Save</button>
+        <button type="button" class="btn" data-close>Annuleren</button>
+        ${isNew ? '<button type="button" class="btn" data-savenew>Opslaan en volgende</button>' : ''}
+        <button type="submit" class="btn primary">Opslaan</button>
       </div>
     </form>`;
-  const w = openModal({ title: (isNew ? 'New transaction' : 'Edit transaction') + ' — ' + esc(accName(viewAcc) || acc.name), body, wide: true });
+  const w = openModal({ title: (isNew ? 'Nieuwe transactie' : 'Transactie wijzigen') + ' — ' + esc(accName(viewAcc) || acc.name), body, wide: true });
   const f = $('#txf', w);
   const err = $('#txerr', w);
 
   function accSelect(name, selected) {
     const accs = DB.accounts.filter(a => !a.closed || a.id === selected).sort((a, b) => a.name.localeCompare(b.name));
-    return `<select name="${name}">${selected ? '' : '<option value="">— Choose an account —</option>'}${accs.map(a => `<option value="${a.id}" ${a.id === selected ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`;
+    return `<select name="${name}">${selected ? '' : '<option value="">— Kies een rekening —</option>'}${accs.map(a => `<option value="${a.id}" ${a.id === selected ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`;
   }
   function renderXferArea() {
     const el = $('#xfer-area', w);
     if (type !== 'xfer') { el.innerHTML = ''; return; }
     el.innerHTML = `<div class="xfer-row">
-      <label>From account${accSelect('xfrom', xferFrom)}</label>
-      <button type="button" class="btn small" data-swap title="Swap the two accounts" aria-label="Swap the two accounts">⇄</button>
-      <label>To account${accSelect('xto', xferTo)}</label></div>`;
+      <label>Van rekening${accSelect('xfrom', xferFrom)}</label>
+      <button type="button" class="btn small" data-swap title="De twee rekeningen omwisselen" aria-label="De twee rekeningen omwisselen">⇄</button>
+      <label>Naar rekening${accSelect('xto', xferTo)}</label></div>`;
     $('select[name=xfrom]', el).onchange = e => { xferFrom = e.target.value; };
     $('select[name=xto]', el).onchange = e => { xferTo = e.target.value; };
     $('[data-swap]', el).onclick = () => { [xferFrom, xferTo] = [xferTo, xferFrom]; renderXferArea(); };
@@ -1092,8 +1092,8 @@ function openTxEditor(tx, accountId, startType) {
     $$('.seg button', w).forEach(b => b.classList.toggle('on', b.dataset.type === type));
     const x = type === 'xfer';
     $('#cat-area', w).style.display = x ? 'none' : '';
-    $('#payee-label', w).innerHTML = x ? 'Description <span class="hint">optional</span>' : 'Payee';
-    f.payee.placeholder = x ? 'e.g. Monthly savings' : 'Who did you pay, or who paid you?';
+    $('#payee-label', w).innerHTML = x ? 'Omschrijving <span class="hint">optioneel</span>' : 'Begunstigde';
+    f.payee.placeholder = x ? 'bijv. Maandelijks sparen' : 'Aan wie betaalde u, of wie betaalde u?';
     renderXferArea();
   }
   $$('.seg button', w).forEach(b => b.onclick = () => {
@@ -1105,7 +1105,7 @@ function openTxEditor(tx, accountId, startType) {
   });
 
   async function handleNewCat(sel, onDone) {
-    const name = await promptBox('New category', 'Category name', '', 'Use “Food : Groceries” to make a subcategory');
+    const name = await promptBox('Nieuwe categorie', 'Naam van de categorie', '', 'Gebruik “Eten : Boodschappen” voor een subcategorie');
     if (name) {
       const r = findOrCreateCategory(name, type === 'pay' ? 'expense' : 'income');
       changed(); onDone('c:' + r.cat.id);
@@ -1115,7 +1115,7 @@ function openTxEditor(tx, accountId, startType) {
   function renderCatArea() {
     const el = $('#cat-area', w);
     if (!splits) {
-      el.innerHTML = `<label>Category<div class="row"><select name="cat">${catOptions(curSel, acctId, { noTransfers: !curSel.startsWith('t:') })}</select><button type="button" class="btn small" data-split title="Divide this transaction over several categories">Split…</button></div></label>`;
+      el.innerHTML = `<label>Categorie<div class="row"><select name="cat">${catOptions(curSel, acctId, { noTransfers: !curSel.startsWith('t:') })}</select><button type="button" class="btn small" data-split title="Deze transactie over meerdere categorieën verdelen">Splitsen…</button></div></label>`;
       const sel = $('select[name=cat]', el);
       sel.onchange = () => {
         if (sel.value === '__new') handleNewCat(sel, v => { if (v) curSel = v; renderCatArea(); });
@@ -1127,13 +1127,13 @@ function openTxEditor(tx, accountId, startType) {
         renderCatArea();
       };
     } else {
-      el.innerHTML = `<div style="font-size:14px;font-weight:550;margin-bottom:4px">Split into categories</div>
+      el.innerHTML = `<div style="font-size:14px;font-weight:550;margin-bottom:4px">Verdelen over categorieën</div>
         <table class="splits"><tbody>${splits.map((s, i) => `<tr>
           <td style="width:45%"><select data-si="${i}" data-f="sel">${catOptions(s.sel, acctId)}</select></td>
-          <td><input data-si="${i}" data-f="memo" value="${esc(s.memo)}" placeholder="Memo"></td>
+          <td><input data-si="${i}" data-f="memo" value="${esc(s.memo)}" placeholder="Notitie"></td>
           <td class="amt"><input data-si="${i}" data-f="amt" value="${esc(s.amt)}" inputmode="decimal" placeholder="0${localeDecimal()}00"></td>
-          <td><button type="button" class="icon-btn" data-rm="${i}" aria-label="Remove line">×</button></td></tr>`).join('')}</tbody></table>
-        <div class="splitsum"><button type="button" class="btn small" data-addline>+ Add line</button><button type="button" class="btn small" data-fill>Put the remainder on the last line</button><button type="button" class="btn small" data-unsplit>Cancel split</button><span id="splitsum"></span></div>`;
+          <td><button type="button" class="icon-btn" data-rm="${i}" aria-label="Regel verwijderen">×</button></td></tr>`).join('')}</tbody></table>
+        <div class="splitsum"><button type="button" class="btn small" data-addline>+ Regel toevoegen</button><button type="button" class="btn small" data-fill>Rest op de laatste regel zetten</button><button type="button" class="btn small" data-unsplit>Splitsen ongedaan maken</button><span id="splitsum"></span></div>`;
       $$('[data-si]', el).forEach(inp => {
         const ev = inp.tagName === 'SELECT' ? 'change' : 'input';
         inp.addEventListener(ev, () => {
@@ -1158,9 +1158,9 @@ function openTxEditor(tx, accountId, startType) {
     const el = $('#splitsum', w); if (!el || !splits) return;
     const sum = splits.reduce((s, x) => s + (parseUserAmount(x.amt) || 0), 0);
     const total = parseUserAmount(f.amount.value);
-    if (total == null) { el.innerHTML = `Lines total ${esc(money(sum))}`; return; }
+    if (total == null) { el.innerHTML = `Regels samen ${esc(money(sum))}`; return; }
     const left = Math.abs(total) - sum;
-    el.innerHTML = left === 0 ? `<span style="color:var(--pos)">✓ Lines add up to the amount</span>` : `Still to assign: <b class="${left < 0 ? 'neg' : ''}">${esc(money(left))}</b>`;
+    el.innerHTML = left === 0 ? `<span style="color:var(--pos)">✓ De regels tellen op tot het bedrag</span>` : `Nog te verdelen: <b class="${left < 0 ? 'neg' : ''}">${esc(money(left))}</b>`;
   }
   f.amount.addEventListener('input', updateSplitSum);
   renderCatArea();
@@ -1191,23 +1191,23 @@ function openTxEditor(tx, accountId, startType) {
   function save() {
     err.textContent = '';
     const date = f.date.value;
-    if (!date) { err.textContent = 'Please enter a date.'; return false; }
+    if (!date) { err.textContent = 'Vul een datum in.'; return false; }
     let amt = parseUserAmount(f.amount.value);
     let outSplits = null;
     if (splits) {
       const lines = splits.map(s => ({ sel: s.sel, memo: s.memo.trim(), v: parseUserAmount(s.amt) })).filter(s => s.v);
-      if (!lines.length) { err.textContent = 'Enter an amount on at least one split line.'; return false; }
+      if (!lines.length) { err.textContent = 'Vul op ten minste één regel een bedrag in.'; return false; }
       const sum = lines.reduce((s, x) => s + x.v, 0);
       if (amt == null) { amt = sum; f.amount.value = moneyPlain(sum); }
-      if (sum !== Math.abs(amt)) { err.textContent = `The split lines add up to ${money(sum)}, but the amount is ${money(Math.abs(amt))}. Adjust a line or use “Put the remainder on the last line”.`; return false; }
+      if (sum !== Math.abs(amt)) { err.textContent = `De regels tellen op tot ${money(sum)}, maar het bedrag is ${money(Math.abs(amt))}. Pas een regel aan of gebruik “Rest op de laatste regel zetten”.`; return false; }
       if (lines.length === 1) { curSel = lines[0].sel; }
       else outSplits = lines.map(l => ({ categoryId: l.sel.startsWith('c:') ? l.sel.slice(2) : null, transferAccountId: l.sel.startsWith('t:') ? l.sel.slice(2) : null, memo: l.memo, amount: l.v * sgn() }));
     }
-    if (amt == null) { err.textContent = 'Please enter an amount.'; f.amount.focus(); return false; }
-    if (amt === 0 && !d.ob) { err.textContent = 'The amount cannot be zero.'; return false; }
+    if (amt == null) { err.textContent = 'Vul een bedrag in.'; f.amount.focus(); return false; }
+    if (amt === 0 && !d.ob) { err.textContent = 'Het bedrag kan niet nul zijn.'; return false; }
     if (type === 'xfer') {
-      if (!xferFrom || !xferTo) { err.textContent = 'Choose both accounts for the transfer.'; return false; }
-      if (xferFrom === xferTo) { err.textContent = 'The two accounts of a transfer must be different.'; return false; }
+      if (!xferFrom || !xferTo) { err.textContent = 'Kies beide rekeningen voor de overboeking.'; return false; }
+      if (xferFrom === xferTo) { err.textContent = 'De twee rekeningen van een overboeking moeten verschillend zijn.'; return false; }
     }
     const fields = type === 'xfer' ? {
       accountId: xferFrom, date, amount: -Math.abs(amt), payee: f.payee.value.trim(), memo: f.memo.value.trim(), num: f.num.value.trim(), status: f.status.value,
@@ -1229,7 +1229,7 @@ function openTxEditor(tx, accountId, startType) {
   const del = $('[data-del]', w);
   if (del) del.onclick = async () => {
     const hasLegs = (idx().legsOf.get(src.id) || []).length;
-    if (!await confirmBox('Delete this transaction?', hasLegs ? '<p>This is a transfer; it will be removed from both accounts.</p>' : '<p>This cannot be undone.</p>', 'Delete', true)) return;
+    if (!await confirmBox('Deze transactie verwijderen?', hasLegs ? '<p>Dit is een overboeking; hij wordt uit beide rekeningen verwijderd.</p>' : '<p>Dit kan niet ongedaan worden gemaakt.</p>', 'Verwijderen', true)) return;
     deleteTx(src); changed(); closeModal(w); render();
   };
 }
@@ -1240,31 +1240,31 @@ function openAccountEditor(acc) {
   const a = acc || { name: '', type: 'checking', note: '', closed: false };
   const n = acc ? (idx().byAcc.get(acc.id) || []).length : 0;
   const w = openModal({
-    title: isNew ? 'Add an account' : 'Account details', body: `<form autocomplete="off">
-    <label>Account name<input name="name" value="${esc(a.name)}" required autofocus placeholder="e.g. ING current account"></label>
-    <label>Kind of account<select name="type">${ACCOUNT_TYPES.map(([k, l]) => `<option value="${k}" ${a.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-    ${isNew ? `<div class="grid2"><label>Balance today <span class="hint" id="obhint">what the account holds now</span><input name="ob" inputmode="decimal" placeholder="0${localeDecimal()}00"></label>
-      <label>On date<input type="date" name="obdate" value="${todayISO()}"></label></div>` : ''}
-    <label>Note <span class="hint">optional (account number, bank, …)</span><input name="note" value="${esc(a.note || '')}"></label>
-    ${!isNew ? `<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="closed" ${a.closed ? 'checked' : ''} style="width:auto;min-height:0"> This account is closed (hide it from the list)</label>` : ''}
+    title: isNew ? 'Rekening toevoegen' : 'Rekeninggegevens', body: `<form autocomplete="off">
+    <label>Naam van de rekening<input name="name" value="${esc(a.name)}" required autofocus placeholder="bijv. ING betaalrekening"></label>
+    <label>Soort rekening<select name="type">${ACCOUNT_TYPES.map(([k, l]) => `<option value="${k}" ${a.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    ${isNew ? `<div class="grid2"><label>Saldo nu <span class="hint" id="obhint">wat er nu op de rekening staat</span><input name="ob" inputmode="decimal" placeholder="0${localeDecimal()}00"></label>
+      <label>Op datum<input type="date" name="obdate" value="${todayISO()}"></label></div>` : ''}
+    <label>Opmerking <span class="hint">optioneel (rekeningnummer, bank, …)</span><input name="note" value="${esc(a.note || '')}"></label>
+    ${!isNew ? `<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="closed" ${a.closed ? 'checked' : ''} style="width:auto;min-height:0"> Deze rekening is opgeheven (niet meer in de lijst tonen)</label>` : ''}
     <div class="err"></div>
-    <div class="modal-actions">${!isNew ? '<button type="button" class="btn danger" data-del>Delete account</button>' : ''}<span class="spacer"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">${isNew ? 'Add account' : 'Save'}</button></div>
+    <div class="modal-actions">${!isNew ? '<button type="button" class="btn danger" data-del>Rekening verwijderen</button>' : ''}<span class="spacer"></span><button type="button" class="btn" data-close>Annuleren</button><button class="btn primary">${isNew ? 'Rekening toevoegen' : 'Opslaan'}</button></div>
   </form>`
   });
   const f = $('form', w);
-  const upHint = () => { const h = $('#obhint', w); if (h) h.textContent = isDebtType(f.type.value) ? 'the amount you owe now' : 'what the account holds now'; };
+  const upHint = () => { const h = $('#obhint', w); if (h) h.textContent = isDebtType(f.type.value) ? 'het bedrag dat u nu verschuldigd bent' : 'wat er nu op de rekening staat'; };
   f.type.onchange = upHint; upHint();
   f.onsubmit = e => {
     e.preventDefault();
     const name = f.name.value.trim();
-    if (!name) { $('.err', w).textContent = 'Please enter a name.'; return; }
-    if (DB.accounts.some(x => x !== acc && x.name.toLowerCase() === name.toLowerCase())) { $('.err', w).textContent = 'There is already an account with this name.'; return; }
+    if (!name) { $('.err', w).textContent = 'Vul een naam in.'; return; }
+    if (DB.accounts.some(x => x !== acc && x.name.toLowerCase() === name.toLowerCase())) { $('.err', w).textContent = 'Er is al een rekening met deze naam.'; return; }
     if (isNew) {
       const na = { id: uid(), name, type: f.type.value, note: f.note.value.trim(), closed: false };
       DB.accounts.push(na);
       let ob = parseUserAmount(f.ob.value) || 0;
       if (isDebtType(na.type)) ob = -Math.abs(ob);
-      if (ob) newTx({ accountId: na.id, date: f.obdate.value || todayISO(), amount: ob, payee: 'Opening balance', ob: true, status: 'R' });
+      if (ob) newTx({ accountId: na.id, date: f.obdate.value || todayISO(), amount: ob, payee: 'Beginsaldo', ob: true, status: 'R' });
       changed(); closeModal(w); go('account', { accountId: na.id });
     } else {
       Object.assign(acc, { name, type: f.type.value, note: f.note.value.trim(), closed: f.closed.checked });
@@ -1273,7 +1273,7 @@ function openAccountEditor(acc) {
   };
   const del = $('[data-del]', w);
   if (del) del.onclick = async () => {
-    if (!await confirmBox('Delete “' + acc.name + '”?', `<p>This deletes the account${n ? ` and its <b>${n.toLocaleString()}</b> transactions` : ''}. Transfers from other accounts to this one will stay in those accounts, but become uncategorized.</p><p>If the account is simply no longer in use, you can mark it as <b>closed</b> instead.</p>`, 'Delete account', true)) return;
+    if (!await confirmBox('“' + acc.name + '” verwijderen?', `<p>Hiermee verwijdert u de rekening${n ? ` en de <b>${n.toLocaleString('nl-NL')}</b> transacties` : ''}. Overboekingen vanaf andere rekeningen naar deze rekening blijven bij die rekeningen staan, maar krijgen geen categorie.</p><p>Gebruikt u de rekening alleen niet meer, dan kunt u hem beter markeren als <b>opgeheven</b>.</p>`, 'Rekening verwijderen', true)) return;
     const gone = new Set(DB.transactions.filter(t => t.accountId === acc.id).map(t => t.id));
     DB.transactions = DB.transactions.filter(t => !gone.has(t.id) && !(t.linkId && gone.has(t.linkId)));
     for (const t of DB.transactions) {
@@ -1291,18 +1291,18 @@ function startReconcile() {
   const debt = isDebtType(a.type);
   const prev = a.lastStatement;
   const w = openModal({
-    title: 'Reconcile ' + esc(a.name), body: `<form>
-    <p class="sub" style="margin-top:0">Compare Kasboek with a statement from your bank. ${prev ? `Last time you reconciled up to ${fmtDate(prev.date)} with a balance of ${esc(money(prev.balance))}.` : ''}</p>
-    <div class="grid2"><label>Statement date<input type="date" name="date" value="${todayISO()}" required></label>
-    <label>${debt ? 'Amount owed on the statement' : 'Ending balance on the statement'}<input name="bal" inputmode="decimal" autofocus placeholder="0${localeDecimal()}00"></label></div>
+    title: esc(a.name) + ' afstemmen', body: `<form>
+    <p class="sub" style="margin-top:0">Vergelijk Kasboek met een afschrift van uw bank. ${prev ? `De vorige keer hebt u afgestemd tot ${fmtDate(prev.date)} met een saldo van ${esc(money(prev.balance))}.` : ''}</p>
+    <div class="grid2"><label>Datum afschrift<input type="date" name="date" value="${todayISO()}" required></label>
+    <label>${debt ? 'Verschuldigd bedrag op het afschrift' : 'Eindsaldo op het afschrift'}<input name="bal" inputmode="decimal" autofocus placeholder="0${localeDecimal()}00"></label></div>
     <div class="err"></div>
-    <div class="modal-actions"><span class="spacer"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Start</button></div></form>`
+    <div class="modal-actions"><span class="spacer"></span><button type="button" class="btn" data-close>Annuleren</button><button class="btn primary">Beginnen</button></div></form>`
   });
   const f = $('form', w);
   f.onsubmit = e => {
     e.preventDefault();
     let v = parseUserAmount(f.bal.value);
-    if (v == null) { $('.err', w).textContent = 'Please enter the balance shown on the statement.'; return; }
+    if (v == null) { $('.err', w).textContent = 'Vul het saldo in dat op het afschrift staat.'; return; }
     if (debt) v = -Math.abs(v);
     const all = idx().byAcc.get(a.id) || [];
     recon = { accountId: a.id, date: f.date.value, ending: v, checked: new Set(all.filter(t => t.status === 'c' && t.date <= f.date.value).map(t => t.id)) };
@@ -1319,7 +1319,7 @@ function finishReconcile(mode) {
   }
   if (mode !== 'postpone') a.lastStatement = { date: recon.date, balance: recon.ending };
   recon = null; changed(); render();
-  toast(mode === 'postpone' ? 'Your ticks are kept; continue later.' : 'Reconciled. Well done!');
+  toast(mode === 'postpone' ? 'Uw vinkjes zijn bewaard; u kunt later verdergaan.' : 'Afgestemd. Goed gedaan!');
 }
 
 /* ---------- Charts ---------- */
@@ -1365,7 +1365,7 @@ function columnsSVG(months, series) {
       else s += `<rect x="${x}" y="${y(0)}" width="${bw}" height="${y(v) - y(0)}" fill="${se.color}" opacity=".7"/>`;
     });
     if (i % every === 0) s += `<text x="${cx}" y="${H - 12}" text-anchor="middle">${esc(fmtMonth(m))}</text>`;
-    const tip = `<b>${esc(fmtMonth(m))}</b><br>` + series.map(se => `${esc(se.name)}: ${esc(money(se.values[i]))}`).join('<br>') + (series.length === 2 ? `<br>Difference: ${esc(money(series[0].values[i] - series[1].values[i]))}` : '');
+    const tip = `<b>${esc(fmtMonth(m))}</b><br>` + series.map(se => `${esc(se.name)}: ${esc(money(se.values[i]))}`).join('<br>') + (series.length === 2 ? `<br>Verschil: ${esc(money(series[0].values[i] - series[1].values[i]))}` : '');
     s += `<rect x="${L + gw * i}" y="${T}" width="${gw}" height="${ph}" fill="transparent" data-tip="${esc(tip)}" class="hit"/>`;
   });
   s += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--axis)" stroke-width="1"/></svg>`;
@@ -1413,12 +1413,12 @@ function wireCharts(root) {
 
 /* ---------- Reports ---------- */
 const REPORTS = [
-  ['spending', 'Spending by category'],
-  ['income', 'Income by category'],
-  ['incexp', 'Income vs. spending'],
-  ['trend', 'Category over time'],
-  ['networth', 'Net worth over time'],
-  ['balances', 'Account balances'],
+  ['spending', 'Uitgaven per categorie'],
+  ['income', 'Inkomsten per categorie'],
+  ['incexp', 'Inkomsten en uitgaven'],
+  ['trend', 'Categorie door de tijd'],
+  ['networth', 'Vermogen door de tijd'],
+  ['balances', 'Saldi per rekening'],
 ];
 function spendingRows(flows, drill, kind) {
   kind = kind || 'expense';
@@ -1428,11 +1428,11 @@ function spendingRows(flows, drill, kind) {
   for (const [k, v] of flows) {
     if (catKind(k) !== kind) continue;
     let key, label;
-    if (k === '_in' || k === '_out') { if (drill) continue; key = k; label = 'Uncategorized'; }
+    if (k === '_in' || k === '_out') { if (drill) continue; key = k; label = 'Zonder categorie'; }
     else {
       const c = I.cat.get(k), top = topCat(k);
       if (!drill) { key = top.id; label = top.name; }
-      else { if (top.id !== drill) continue; key = c.id; label = c.parentId ? c.name : top.name + ' (general)'; }
+      else { if (top.id !== drill) continue; key = c.id; label = c.parentId ? c.name : top.name + ' (algemeen)'; }
     }
     const e = m.get(key) || { key, label, value: 0 };
     e.value += v * sign; m.set(key, e);
@@ -1459,12 +1459,12 @@ function clampMonths(from, to) {
 function viewReports() {
   const rs = reportState;
   const [from, to] = periodRange(rs.period, rs.custom);
-  const accSel = `<select id="rp-acc"><option value="all">All accounts</option>${DB.accounts.map(a => `<option value="${a.id}" ${rs.account === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`;
-  const periodSel = `<select id="rp-period">${PERIODS.map(([k, l]) => `<option value="${k}" ${rs.period === k ? 'selected' : ''}>${l}</option>`).join('')}</select>${rs.period === 'custom' ? ` <input type="date" id="rp-from" value="${esc(rs.custom.from || '')}"> to <input type="date" id="rp-to" value="${esc(rs.custom.to || '')}">` : ''}`;
+  const accSel = `<select id="rp-acc"><option value="all">Alle rekeningen</option>${DB.accounts.map(a => `<option value="${a.id}" ${rs.account === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`;
+  const periodSel = `<select id="rp-period">${PERIODS.map(([k, l]) => `<option value="${k}" ${rs.period === k ? 'selected' : ''}>${l}</option>`).join('')}</select>${rs.period === 'custom' ? ` <input type="date" id="rp-from" value="${esc(rs.custom.from || '')}"> t/m <input type="date" id="rp-to" value="${esc(rs.custom.to || '')}">` : ''}`;
   let content = '', csv = null;
   const I = idx();
   const title = (REPORTS.find(r => r[0] === rs.type) || REPORTS[0])[1];
-  const accLabel = rs.account === 'all' ? 'All accounts' : accName(rs.account);
+  const accLabel = rs.account === 'all' ? 'Alle rekeningen' : accName(rs.account);
 
   if (rs.type === 'spending' || rs.type === 'income') {
     const kind = rs.type === 'spending' ? 'expense' : 'income';
@@ -1472,36 +1472,36 @@ function viewReports() {
     if (rs.drill2) {
       const list = txForCategory(from, to, rs.account, rs.drill2);
       const total = list.reduce((s, x) => s + x.amount, 0);
-      const lab = rs.drill2 === '_in' || rs.drill2 === '_out' ? 'Uncategorized' : catName(rs.drill2);
-      content = `<div class="crumbs"><button class="btn link" data-rdrill="">All categories</button>${rs.drill ? ` › <button class="btn link" data-rdrill="${esc(rs.drill)}">${esc(catName(rs.drill))}</button>` : ''} › ${esc(lab)}</div>
-        <table class="t"><thead><tr><th>Date</th><th>Account</th><th>Payee</th><th>Memo</th><th class="num">Amount</th></tr></thead><tbody>
+      const lab = rs.drill2 === '_in' || rs.drill2 === '_out' ? 'Zonder categorie' : catName(rs.drill2);
+      content = `<div class="crumbs"><button class="btn link" data-rdrill="">Alle categorieën</button>${rs.drill ? ` › <button class="btn link" data-rdrill="${esc(rs.drill)}">${esc(catName(rs.drill))}</button>` : ''} › ${esc(lab)}</div>
+        <table class="t"><thead><tr><th>Datum</th><th>Rekening</th><th>Begunstigde</th><th>Notitie</th><th class="num">Bedrag</th></tr></thead><tbody>
         ${list.map(x => `<tr class="click" data-acc="${x.t.accountId}"><td>${fmtDate(x.t.date)}</td><td>${esc(accName(x.t.accountId))}</td><td>${esc(x.t.payee)}</td><td class="muted">${esc(x.memo)}</td><td class="num">${moneyHTML(x.amount)}</td></tr>`).join('')}
-        </tbody><tfoot><tr><td colspan="4">Total (${list.length} transactions)</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>`;
-      csv = [['Date', 'Account', 'Payee', 'Memo', 'Amount']].concat(list.map(x => [fmtDate(x.t.date), accName(x.t.accountId), x.t.payee, x.memo, moneyPlain(x.amount)]));
+        </tbody><tfoot><tr><td colspan="4">Totaal (${list.length} transacties)</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>`;
+      csv = [['Datum', 'Rekening', 'Begunstigde', 'Notitie', 'Bedrag']].concat(list.map(x => [fmtDate(x.t.date), accName(x.t.accountId), x.t.payee, x.memo, moneyPlain(x.amount)]));
     } else {
       const rows = spendingRows(flows, rs.drill, kind);
       const total = rows.reduce((s, r) => s + r.value, 0);
       const hasSubs = k => k !== '_in' && k !== '_out' && (I.childrenOf.get(k) || []).length > 0;
       rows.forEach(r => { r.drillTo = (!rs.drill && hasSubs(r.key)) ? 'cat' : 'tx'; });
-      content = `${rs.drill ? `<div class="crumbs"><button class="btn link" data-rdrill="">All categories</button> › ${esc(catName(rs.drill))}</div>` : `<div class="crumbs muted">Click a category to see ${'its details'}.</div>`}
-        ${rows.length ? hbarsHTML(rows, true) + `<table class="t" style="margin-top:18px"><thead><tr><th>Category</th><th class="num">Amount</th><th class="num">Share</th></tr></thead><tbody>
-          ${rows.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${esc(money(r.value))}</td><td class="num muted">${(r.value / total * 100).toFixed(1)}%</td></tr>`).join('')}
-          </tbody><tfoot><tr><td>Total</td><td class="num">${esc(money(total))}</td><td></td></tr></tfoot></table>`
-        : `<p class="muted">Nothing recorded in this period.</p>`}`;
-      csv = [['Category', 'Amount']].concat(rows.map(r => [r.label, moneyPlain(r.value)]));
+      content = `${rs.drill ? `<div class="crumbs"><button class="btn link" data-rdrill="">Alle categorieën</button> › ${esc(catName(rs.drill))}</div>` : `<div class="crumbs muted">Klik op een categorie voor de details.</div>`}
+        ${rows.length ? hbarsHTML(rows, true) + `<table class="t" style="margin-top:18px"><thead><tr><th>Categorie</th><th class="num">Bedrag</th><th class="num">Aandeel</th></tr></thead><tbody>
+          ${rows.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${esc(money(r.value))}</td><td class="num muted">${(r.value / total * 100).toFixed(1).replace('.', ',')}%</td></tr>`).join('')}
+          </tbody><tfoot><tr><td>Totaal</td><td class="num">${esc(money(total))}</td><td></td></tr></tfoot></table>`
+        : `<p class="muted">Niets geboekt in deze periode.</p>`}`;
+      csv = [['Categorie', 'Bedrag']].concat(rows.map(r => [r.label, moneyPlain(r.value)]));
     }
   } else if (rs.type === 'incexp') {
     const months = clampMonths(from, to);
     const inc = [], exp = [];
     for (const m of months) { const { income, expense } = sumByKind(categoryFlows(m + '-01', m + '-31', rs.account)); inc.push(income); exp.push(expense); }
     const ti = inc.reduce((a, b) => a + b, 0), te = exp.reduce((a, b) => a + b, 0);
-    content = months.length ? `<div class="legend"><span><i style="background:var(--s1)"></i>Income</span><span><i style="background:var(--s2)"></i>Spending</span></div>
-      <div class="chart">${columnsSVG(months, [{ name: 'Income', color: 'var(--s1)', values: inc }, { name: 'Spending', color: 'var(--s2)', values: exp }])}</div>
-      <table class="t" style="margin-top:18px"><thead><tr><th>Month</th><th class="num">Income</th><th class="num">Spending</th><th class="num">Difference</th></tr></thead><tbody>
+    content = months.length ? `<div class="legend"><span><i style="background:var(--s1)"></i>Inkomsten</span><span><i style="background:var(--s2)"></i>Uitgaven</span></div>
+      <div class="chart">${columnsSVG(months, [{ name: 'Inkomsten', color: 'var(--s1)', values: inc }, { name: 'Uitgaven', color: 'var(--s2)', values: exp }])}</div>
+      <table class="t" style="margin-top:18px"><thead><tr><th>Maand</th><th class="num">Inkomsten</th><th class="num">Uitgaven</th><th class="num">Verschil</th></tr></thead><tbody>
       ${months.map((m, i) => `<tr><td>${esc(fmtMonth(m))}</td><td class="num">${esc(money(inc[i]))}</td><td class="num">${esc(money(exp[i]))}</td><td class="num">${moneyHTML(inc[i] - exp[i])}</td></tr>`).reverse().join('')}
-      </tbody><tfoot><tr><td>Total</td><td class="num">${esc(money(ti))}</td><td class="num">${esc(money(te))}</td><td class="num">${moneyHTML(ti - te)}</td></tr>
-      <tr><td class="muted">Average per month</td><td class="num muted">${esc(money(Math.round(ti / months.length)))}</td><td class="num muted">${esc(money(Math.round(te / months.length)))}</td><td class="num muted">${esc(money(Math.round((ti - te) / months.length)))}</td></tr></tfoot></table>` : '<p class="muted">Nothing recorded in this period.</p>';
-    csv = [['Month', 'Income', 'Spending', 'Difference']].concat(months.map((m, i) => [m, moneyPlain(inc[i]), moneyPlain(exp[i]), moneyPlain(inc[i] - exp[i])]));
+      </tbody><tfoot><tr><td>Totaal</td><td class="num">${esc(money(ti))}</td><td class="num">${esc(money(te))}</td><td class="num">${moneyHTML(ti - te)}</td></tr>
+      <tr><td class="muted">Gemiddeld per maand</td><td class="num muted">${esc(money(Math.round(ti / months.length)))}</td><td class="num muted">${esc(money(Math.round(te / months.length)))}</td><td class="num muted">${esc(money(Math.round((ti - te) / months.length)))}</td></tr></tfoot></table>` : '<p class="muted">Niets geboekt in deze periode.</p>';
+    csv = [['Maand', 'Inkomsten', 'Uitgaven', 'Verschil']].concat(months.map((m, i) => [m, moneyPlain(inc[i]), moneyPlain(exp[i]), moneyPlain(inc[i] - exp[i])]));
   } else if (rs.type === 'trend') {
     const months = clampMonths(from, to);
     const cid = rs.catSel;
@@ -1512,11 +1512,11 @@ function viewReports() {
       vals = months.map(m => { let v = 0; for (const [k, x] of categoryFlows(m + '-01', m + '-31', rs.account)) if (ids.has(k)) v += x * sign; return v; });
     }
     const tot = vals.reduce((a, b) => a + b, 0);
-    content = `<div class="toolbar"><label style="margin:0;display:flex;gap:8px;align-items:center">Category <select id="rp-cat" style="width:auto">${catOptions(cid ? 'c:' + cid : '', null, { noTransfers: true, noNew: true, noneLabel: '— Choose a category —' })}</select></label></div>
-      ${!cid ? '<p class="muted">Choose a category to see how it changed month by month.</p>' : months.length ? `<div class="chart">${columnsSVG(months, [{ name: catName(cid), color: 'var(--s1)', values: vals }])}</div>
-      <p class="sub">Total ${esc(money(tot))} · average ${esc(money(Math.round(tot / months.length)))} per month${(I.childrenOf.get(cid) || []).length ? ' · includes subcategories' : ''}</p>
-      <table class="t" style="margin-top:12px"><thead><tr><th>Month</th><th class="num">${esc(catName(cid))}</th></tr></thead><tbody>${months.map((m, i) => `<tr><td>${esc(fmtMonth(m))}</td><td class="num">${esc(money(vals[i]))}</td></tr>`).reverse().join('')}</tbody></table>` : '<p class="muted">Nothing recorded in this period.</p>'}`;
-    if (cid) csv = [['Month', catName(cid)]].concat(months.map((m, i) => [m, moneyPlain(vals[i])]));
+    content = `<div class="toolbar"><label style="margin:0;display:flex;gap:8px;align-items:center">Categorie <select id="rp-cat" style="width:auto">${catOptions(cid ? 'c:' + cid : '', null, { noTransfers: true, noNew: true, noneLabel: '— Kies een categorie —' })}</select></label></div>
+      ${!cid ? '<p class="muted">Kies een categorie om te zien hoe die per maand veranderde.</p>' : months.length ? `<div class="chart">${columnsSVG(months, [{ name: catName(cid), color: 'var(--s1)', values: vals }])}</div>
+      <p class="sub">Totaal ${esc(money(tot))} · gemiddeld ${esc(money(Math.round(tot / months.length)))} per maand${(I.childrenOf.get(cid) || []).length ? ' · inclusief subcategorieën' : ''}</p>
+      <table class="t" style="margin-top:12px"><thead><tr><th>Maand</th><th class="num">${esc(catName(cid))}</th></tr></thead><tbody>${months.map((m, i) => `<tr><td>${esc(fmtMonth(m))}</td><td class="num">${esc(money(vals[i]))}</td></tr>`).reverse().join('')}</tbody></table>` : '<p class="muted">Niets geboekt in deze periode.</p>'}`;
+    if (cid) csv = [['Maand', catName(cid)]].concat(months.map((m, i) => [m, moneyPlain(vals[i])]));
   } else if (rs.type === 'networth') {
     const months = clampMonths(from, to);
     const accs = rs.account === 'all' ? DB.accounts.map(a => a.id) : [rs.account];
@@ -1524,10 +1524,10 @@ function viewReports() {
     const txs = DB.transactions.filter(t => set.has(t.accountId)).sort(cmpTx);
     const vals = []; let run = 0, i = 0;
     for (const m of months) { const end = m + '-31'; while (i < txs.length && txs[i].date <= end) run += txs[i++].amount; vals.push(run); }
-    content = months.length ? `<div class="chart">${lineSVG(months, vals, rs.account === 'all' ? 'Net worth' : accName(rs.account))}</div>
-      <table class="t" style="margin-top:18px"><thead><tr><th>End of month</th><th class="num">${rs.account === 'all' ? 'Net worth' : 'Balance'}</th><th class="num">Change</th></tr></thead><tbody>
-      ${months.map((m, k) => `<tr><td>${esc(fmtMonth(m))}</td><td class="num">${moneyHTML(vals[k])}</td><td class="num">${k ? moneyHTML(vals[k] - vals[k - 1]) : ''}</td></tr>`).reverse().join('')}</tbody></table>` : '<p class="muted">No data yet.</p>';
-    csv = [['Month', 'Value']].concat(months.map((m, k) => [m, moneyPlain(vals[k])]));
+    content = months.length ? `<div class="chart">${lineSVG(months, vals, rs.account === 'all' ? 'Vermogen' : accName(rs.account))}</div>
+      <table class="t" style="margin-top:18px"><thead><tr><th>Eind van de maand</th><th class="num">${rs.account === 'all' ? 'Vermogen' : 'Saldo'}</th><th class="num">Verandering</th></tr></thead><tbody>
+      ${months.map((m, k) => `<tr><td>${esc(fmtMonth(m))}</td><td class="num">${moneyHTML(vals[k])}</td><td class="num">${k ? moneyHTML(vals[k] - vals[k - 1]) : ''}</td></tr>`).reverse().join('')}</tbody></table>` : '<p class="muted">Nog geen gegevens.</p>';
+    csv = [['Maand', 'Waarde']].concat(months.map((m, k) => [m, moneyPlain(vals[k])]));
   } else if (rs.type === 'balances') {
     const asOf = to > todayISO() ? todayISO() : to;
     const rows = [];
@@ -1539,19 +1539,19 @@ function viewReports() {
         rows.push([label, a.name, b]); total += b;
       }
     }
-    content = `<p class="sub" style="margin-top:0">Balances on ${fmtDate(asOf)} (end of the chosen period).</p>
-      <table class="t"><thead><tr><th>Group</th><th>Account</th><th class="num">Balance</th></tr></thead><tbody>
+    content = `<p class="sub" style="margin-top:0">Saldi op ${fmtDate(asOf)} (einde van de gekozen periode).</p>
+      <table class="t"><thead><tr><th>Groep</th><th>Rekening</th><th class="num">Saldo</th></tr></thead><tbody>
       ${rows.map(r => `<tr><td class="muted">${esc(r[0])}</td><td>${esc(r[1])}</td><td class="num">${moneyHTML(r[2])}</td></tr>`).join('')}
-      </tbody><tfoot><tr><td></td><td>Net worth</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>`;
-    csv = [['Group', 'Account', 'Balance']].concat(rows.map(r => [r[0], r[1], moneyPlain(r[2])]));
+      </tbody><tfoot><tr><td></td><td>Vermogen</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>`;
+    csv = [['Groep', 'Rekening', 'Saldo']].concat(rows.map(r => [r[0], r[1], moneyPlain(r[2])]));
   }
   reportState._csv = csv;
   const showAcc = rs.type !== 'balances';
   return `<div class="page">
-    <div class="head"><div class="grow"><h1>Reports</h1></div></div>
+    <div class="head"><div class="grow"><h1>Rapporten</h1></div></div>
     <div class="tabs">${REPORTS.map(([k, l]) => `<button data-rtype="${k}" class="${rs.type === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div class="toolbar">${periodSel} ${showAcc ? accSel : ''}<span class="grow"></span>
-      ${csv ? '<button class="btn small" data-act="report-csv">Export to spreadsheet</button>' : ''}<button class="btn small" data-act="print">Print</button></div>
+      ${csv ? '<button class="btn small" data-act="report-csv">Exporteren naar spreadsheet</button>' : ''}<button class="btn small" data-act="print">Afdrukken</button></div>
     <div class="card"><h2>${esc(title)} <span class="hint">· ${esc(periodLabel(rs.period, rs.custom))}${showAcc ? ' · ' + esc(accLabel) : ''}</span></h2>${content}</div>
   </div>`;
 }
@@ -1564,12 +1564,12 @@ function viewCategories() {
     if (t.categoryId) counts.set(t.categoryId, (counts.get(t.categoryId) || 0) + 1);
     if (t.splits) for (const s of t.splits) if (s.categoryId) counts.set(s.categoryId, (counts.get(s.categoryId) || 0) + 1);
   }
-  const row = (c, child) => `<div class="catrow ${child ? 'child' : ''}"><span class="nm">${esc(c.name)}</span><span class="pill">${(counts.get(c.id) || 0).toLocaleString()} uses</span>
-    <span class="acts">${!child ? `<button class="btn link" data-cat-sub="${c.id}">+ Sub</button>` : ''}<button class="btn link" data-cat-ren="${c.id}">Rename</button>${!child ? `<button class="btn link" data-cat-kind="${c.id}">Make ${c.kind === 'expense' ? 'income' : 'expense'}</button>` : ''}<button class="btn link" data-cat-del="${c.id}" style="color:var(--neg)">Delete</button></span></div>`;
-  const block = kind => sortedTopCats(kind).map(t => row(t, false) + (I.childrenOf.get(t.id) || []).map(s => row(s, true)).join('')).join('') || '<p class="muted">None yet.</p>';
-  return `<div class="page"><div class="head"><div class="grow"><h1>Categories</h1><p class="sub">Deleting a category lets you move its transactions to another one, which is also how you merge categories.</p></div>
-    <button class="btn primary" data-act="cat-add">+ New category</button></div>
-    <div class="cols2"><div class="card"><h2>Expenses</h2>${block('expense')}</div><div class="card"><h2>Income</h2>${block('income')}</div></div></div>`;
+  const row = (c, child) => `<div class="catrow ${child ? 'child' : ''}"><span class="nm">${esc(c.name)}</span><span class="pill">${(counts.get(c.id) || 0).toLocaleString('nl-NL')}× gebruikt</span>
+    <span class="acts">${!child ? `<button class="btn link" data-cat-sub="${c.id}">+ Sub</button>` : ''}<button class="btn link" data-cat-ren="${c.id}">Hernoemen</button>${!child ? `<button class="btn link" data-cat-kind="${c.id}">Maak ${c.kind === 'expense' ? 'inkomsten' : 'uitgaven'}</button>` : ''}<button class="btn link" data-cat-del="${c.id}" style="color:var(--neg)">Verwijderen</button></span></div>`;
+  const block = kind => sortedTopCats(kind).map(t => row(t, false) + (I.childrenOf.get(t.id) || []).map(s => row(s, true)).join('')).join('') || '<p class="muted">Nog geen.</p>';
+  return `<div class="page"><div class="head"><div class="grow"><h1>Categorieën</h1><p class="sub">Bij het verwijderen van een categorie kunt u de transacties naar een andere categorie verplaatsen. Zo voegt u ook categorieën samen.</p></div>
+    <button class="btn primary" data-act="cat-add">+ Nieuwe categorie</button></div>
+    <div class="cols2"><div class="card"><h2>Uitgaven</h2>${block('expense')}</div><div class="card"><h2>Inkomsten</h2>${block('income')}</div></div></div>`;
 }
 async function deleteCategory(id) {
   const I = idx(), c = I.cat.get(id); if (!c) return;
@@ -1578,10 +1578,10 @@ async function deleteCategory(id) {
   let n = 0;
   for (const t of DB.transactions) { if (ids.has(t.categoryId)) n++; if (t.splits) for (const s of t.splits) if (ids.has(s.categoryId)) n++; }
   const w = openModal({
-    title: 'Delete “' + esc(c.name) + '”', body: `<form>
-    <p>${subs.length ? `This also deletes its ${subs.length} subcategories. ` : ''}${n ? `It is used <b>${n.toLocaleString()}</b> times.` : 'It is not used by any transaction.'}</p>
-    ${n ? `<label>Move those transactions to<select name="to">${catOptions('', null, { noTransfers: true, noNew: true, noneLabel: '— Leave uncategorized —' }).replace(new RegExp(`<option value="c:(${Array.from(ids).join('|')})"[^>]*>[^<]*</option>`, 'g'), '')}</select></label>` : ''}
-    <div class="modal-actions"><span class="spacer"></span><button type="button" class="btn" data-close>Cancel</button><button class="btn danger">Delete</button></div></form>`
+    title: '“' + esc(c.name) + '” verwijderen', body: `<form>
+    <p>${subs.length ? `Ook de ${subs.length} subcategorieën worden verwijderd. ` : ''}${n ? `Hij wordt <b>${n.toLocaleString('nl-NL')}</b> keer gebruikt.` : 'Hij wordt door geen enkele transactie gebruikt.'}</p>
+    ${n ? `<label>Die transacties verplaatsen naar<select name="to">${catOptions('', null, { noTransfers: true, noNew: true, noneLabel: '— Zonder categorie laten —' }).replace(new RegExp(`<option value="c:(${Array.from(ids).join('|')})"[^>]*>[^<]*</option>`, 'g'), '')}</select></label>` : ''}
+    <div class="modal-actions"><span class="spacer"></span><button type="button" class="btn" data-close>Annuleren</button><button class="btn danger">Verwijderen</button></div></form>`
   });
   $('form', w).onsubmit = e => {
     e.preventDefault();
@@ -1596,47 +1596,47 @@ async function deleteCategory(id) {
 function viewSettings() {
   const s = DB.settings;
   const cur = ['EUR', 'USD', 'GBP', 'CHF', 'SEK', 'NOK', 'DKK', 'CAD', 'AUD', 'JPY'];
-  const loc = [['nl-NL', 'Dutch (1.234,56 · 23-10-2026)'], ['nl-BE', 'Belgian Dutch'], ['de-DE', 'German'], ['fr-FR', 'French'], ['en-GB', 'English, UK (1,234.56 · 23/10/2026)'], ['en-US', 'English, US (1,234.56 · 10/23/2026)']];
-  const last = DB.lastBackup ? new Date(DB.lastBackup).toLocaleString(s.locale) : 'never';
-  return `<div class="page"><div class="head"><div class="grow"><h1>Settings &amp; backup</h1></div></div>
+  const loc = [['nl-NL', 'Nederlands (1.234,56 · 23-10-2026)'], ['nl-BE', 'Belgisch-Nederlands'], ['de-DE', 'Duits'], ['fr-FR', 'Frans'], ['en-GB', 'Engels, VK (1,234.56 · 23/10/2026)'], ['en-US', 'Engels, VS (1,234.56 · 10/23/2026)']];
+  const last = DB.lastBackup ? new Date(DB.lastBackup).toLocaleString(s.locale) : 'nog nooit';
+  return `<div class="page"><div class="head"><div class="grow"><h1>Instellingen &amp; reservekopie</h1></div></div>
   <div class="cards">
-    <div class="card"><h2>Kasboek as an app</h2>
-      ${isInstalledApp() ? `<p class="sub" style="margin-top:0">You are using the installed Kasboek app. Updates arrive automatically the next time you start it while connected to the internet.</p>`
-      : installPrompt ? `<p class="sub" style="margin-top:0">Install Kasboek as a program with its own icon in the Dock or Start menu. It then opens in its own window, also without internet.</p><div class="row" style="margin-top:12px"><button class="btn primary" data-act="install">Install Kasboek</button></div>`
-      : IS_WEB ? `<p class="sub" style="margin-top:0">To install Kasboek as a program, use <b>Google Chrome</b> or <b>Microsoft Edge</b>: click the install icon at the right end of the address bar, or open the browser menu and choose <b>Install Kasboek…</b> (in Chrome under “Cast, save and share”, in Edge under “Apps”).</p>`
-      : `<p class="sub" style="margin-top:0">You opened Kasboek as a file. To install it as a program, open it from its web address in Chrome or Edge.</p>`}
-      <p class="hint" style="margin-top:10px">Kasboek version ${APP_VERSION}</p>
+    <div class="card"><h2>Kasboek als programma</h2>
+      ${isInstalledApp() ? `<p class="sub" style="margin-top:0">U gebruikt het geïnstalleerde Kasboek. Nieuwe versies komen vanzelf binnen als u het start terwijl u met internet verbonden bent.</p>`
+      : installPrompt ? `<p class="sub" style="margin-top:0">Installeer Kasboek als programma met een eigen pictogram in het Dock of Startmenu. Het opent dan in een eigen venster, ook zonder internet.</p><div class="row" style="margin-top:12px"><button class="btn primary" data-act="install">Kasboek installeren</button></div>`
+      : IS_WEB ? `<p class="sub" style="margin-top:0">Om Kasboek als programma te installeren gebruikt u <b>Google Chrome</b> of <b>Microsoft Edge</b>: klik op het installatiepictogram rechts in de adresbalk, of open het menu van de browser en kies <b>Kasboek installeren…</b> (in Chrome onder “Casten, opslaan en delen”, in Edge onder “Apps”).</p>`
+      : `<p class="sub" style="margin-top:0">U hebt Kasboek als bestand geopend. Om het als programma te installeren opent u het via het webadres in Chrome of Edge.</p>`}
+      <p class="hint" style="margin-top:10px">Kasboek versie ${APP_VERSION}</p>
     </div>
-    <div class="card"><h2>Use Kasboek on two computers</h2>
-      ${!fsSupported ? `<p class="sub" style="margin-top:0">To share your data with another computer, open Kasboek in <b>Google Chrome</b> (Mac or Windows) or <b>Microsoft Edge</b> (Windows). This browser cannot save to a shared file.</p>`
-      : fileHandle ? `<p class="sub" style="margin-top:0">Kasboek saves everything in the shared file <b>${esc(fileHandle.name)}</b>. Changes from the other computer are picked up automatically, usually within a minute.</p>
+    <div class="card"><h2>Kasboek op twee computers gebruiken</h2>
+      ${!fsSupported ? `<p class="sub" style="margin-top:0">Om uw gegevens met een andere computer te delen opent u Kasboek in <b>Google Chrome</b> (Mac of Windows) of <b>Microsoft Edge</b> (Windows). Deze browser kan niet in een gedeeld bestand opslaan.</p>`
+      : fileHandle ? `<p class="sub" style="margin-top:0">Kasboek bewaart alles in het gedeelde bestand <b>${esc(fileHandle.name)}</b>. Wijzigingen van de andere computer worden automatisch opgehaald, meestal binnen een minuut.</p>
         <div class="row" style="flex-wrap:wrap;margin-top:12px">
-          ${fileStatus === 'needs-permission' ? '<button class="btn primary" data-act="fs-reconnect">Open shared file</button>' : '<button class="btn" data-act="fs-sync">Check for changes now</button>'}
-          <button class="btn" data-act="fs-merge">Combine with another file…</button>
-          <button class="btn" data-act="fs-stop">Stop sharing</button></div>
-        <p class="hint" style="margin-top:12px">If you both change things at exactly the same moment, the cloud service may keep a second copy, for example “Kasboek data (1).json”. Use “Combine with another file…” on that copy, then delete it.</p>`
-      : `<p class="sub" style="margin-top:0">Put Kasboek's data in a folder that both computers can reach, such as iCloud Drive, OneDrive, Dropbox or Google Drive. Both of you then work in the same data, and changes made at the same time are combined.</p>
+          ${fileStatus === 'needs-permission' ? '<button class="btn primary" data-act="fs-reconnect">Gedeeld bestand openen</button>' : '<button class="btn" data-act="fs-sync">Nu op wijzigingen controleren</button>'}
+          <button class="btn" data-act="fs-merge">Samenvoegen met een ander bestand…</button>
+          <button class="btn" data-act="fs-stop">Stoppen met delen</button></div>
+        <p class="hint" style="margin-top:12px">Als u allebei op precies hetzelfde moment iets wijzigt, kan de clouddienst een tweede kopie bewaren, bijvoorbeeld “Kasboek gegevens (1).json”. Gebruik dan “Samenvoegen met een ander bestand…” voor die kopie en verwijder hem daarna.</p>`
+      : `<p class="sub" style="margin-top:0">Zet de gegevens van Kasboek in een map die beide computers kunnen bereiken, zoals iCloud Drive, OneDrive, Dropbox of Google Drive. U werkt dan allebei in dezelfde gegevens, en wijzigingen die tegelijk worden gedaan, worden samengevoegd.</p>
         <ol class="steps">
-          <li>On the computer that has your data: click <b>Create shared file…</b> and save it in the shared folder.</li>
-          <li>On the other computer: open Kasboek in Chrome or Edge, click <b>Open existing shared file…</b> and choose that same file.</li>
+          <li>Op de computer met uw gegevens: klik op <b>Gedeeld bestand maken…</b> en sla het op in de gedeelde map.</li>
+          <li>Op de andere computer: open Kasboek in Chrome of Edge, klik op <b>Bestaand gedeeld bestand openen…</b> en kies datzelfde bestand.</li>
         </ol>
-        <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-act="fs-create">Create shared file…</button><button class="btn" data-act="fs-open">Open existing shared file…</button></div>`}
+        <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-act="fs-create">Gedeeld bestand maken…</button><button class="btn" data-act="fs-open">Bestaand gedeeld bestand openen…</button></div>`}
     </div>
-    <div class="card"><h2>Backup</h2>
-      <p class="sub" style="margin-top:0">Kasboek saves every change automatically in this browser on this computer. A backup file is your safety net: save one regularly and keep a copy elsewhere (for example on iCloud Drive or a USB stick). Last backup file: <b>${esc(last)}</b>.</p>
-      <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-act="save-backup">Save backup file</button><button class="btn" data-act="open-backup">Open backup file…</button></div>
+    <div class="card"><h2>Reservekopie</h2>
+      <p class="sub" style="margin-top:0">Kasboek bewaart elke wijziging automatisch in deze browser op deze computer. Een reservekopie is uw vangnet: sla er regelmatig een op en bewaar een exemplaar ergens anders (bijvoorbeeld op iCloud Drive of een USB-stick). Laatste reservekopie: <b>${esc(last)}</b>.</p>
+      <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-act="save-backup">Reservekopie opslaan</button><button class="btn" data-act="open-backup">Reservekopie openen…</button></div>
     </div>
-    <div class="card"><h2>Display</h2>
+    <div class="card"><h2>Weergave</h2>
       <div class="grid2">
-        <label>Currency<select id="set-cur">${cur.map(c => `<option ${s.currency === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
-        <label>Number and date format<select id="set-loc">${loc.map(([k, l]) => `<option value="${k}" ${s.locale === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-        <label>Appearance<select id="set-theme"><option value="system" ${s.theme === 'system' ? 'selected' : ''}>Same as this computer</option><option value="light" ${s.theme === 'light' ? 'selected' : ''}>Light</option><option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>Dark</option></select></label>
+        <label>Valuta<select id="set-cur">${cur.map(c => `<option ${s.currency === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+        <label>Notatie van getallen en datums<select id="set-loc">${loc.map(([k, l]) => `<option value="${k}" ${s.locale === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label>Uiterlijk<select id="set-theme"><option value="system" ${s.theme === 'system' ? 'selected' : ''}>Zoals deze computer</option><option value="light" ${s.theme === 'light' ? 'selected' : ''}>Licht</option><option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>Donker</option></select></label>
       </div>
-      <p class="hint">Example: ${esc(money(-123456))} on ${esc(fmtDate(todayISO()))}</p>
+      <p class="hint">Voorbeeld: ${esc(money(-123456))} op ${esc(fmtDate(todayISO()))}</p>
     </div>
-    <div class="card"><h2>Your data</h2>
-      <p class="sub" style="margin-top:0">${DB.accounts.length} accounts · ${DB.categories.length} categories · ${DB.transactions.length.toLocaleString()} transactions${(() => { const [a, b] = dataDateRange(); return a ? ` · from ${fmtDate(a)} to ${fmtDate(b)}` : ''; })()}</p>
-      <div class="row" style="margin-top:12px"><button class="btn danger" data-act="erase">Erase all data…</button></div>
+    <div class="card"><h2>Uw gegevens</h2>
+      <p class="sub" style="margin-top:0">${DB.accounts.length} rekeningen · ${DB.categories.length} categorieën · ${DB.transactions.length.toLocaleString('nl-NL')} transacties${(() => { const [a, b] = dataDateRange(); return a ? ` · van ${fmtDate(a)} tot en met ${fmtDate(b)}` : ''; })()}</p>
+      <div class="row" style="margin-top:12px"><button class="btn danger" data-act="erase">Alle gegevens wissen…</button></div>
     </div>
   </div></div>`;
 }
@@ -1762,7 +1762,7 @@ async function readQifFiles(files) {
     const accounts = Array.from(groups.values()).map(g => {
       // Money's export starts with an "Opening Balance" line that names the account itself: L[Account name]
       let guess = g.qifName;
-      if (!guess) { const ob = g.records.find(r => /opening balance/i.test(r.P || '') && /^\[.+\]/.test(r.L || '')); if (ob) guess = splitCatField(ob.L).transfer; }
+      if (!guess) { const ob = g.records.find(r => /opening balance|beginsaldo|openingssaldo/i.test(r.P || '') && /^\[.+\]/.test(r.L || '')); if (ob) guess = splitCatField(ob.L).transfer; }
       const name = guess || base;
       const existing = DB.accounts.find(a => a.name.toLowerCase() === name.toLowerCase());
       const ds = g.records.map(r => r.D).filter(Boolean);
@@ -1784,7 +1784,7 @@ function runImport(plan) {
     if (g.skip) continue;
     let id = g.target;
     if (id === 'new') {
-      const nm = (g.newName || g.qifName || 'Imported account').trim();
+      const nm = (g.newName || g.qifName || 'Geïmporteerde rekening').trim();
       let ex = DB.accounts.find(a => a.name.toLowerCase() === nm.toLowerCase());
       if (!ex) { ex = { id: uid(), name: nm, type: g.type, note: '', closed: false }; DB.accounts.push(ex); st.newAccounts.push(nm); }
       id = ex.id;
@@ -1825,7 +1825,7 @@ function runImport(plan) {
         const hasSplits = r.splits && r.splits.length > 1 || (r.splits && r.splits.length === 1 && r.splits[0].$ != null && parseQifAmount(r.splits[0].$, f.comma) !== amount);
         // opening balance: a transfer to the account itself
         if (!r.splits && lf.transfer && resolveAcc(lf.transfer) === acctId) {
-          newTx({ accountId: acctId, date, amount, payee: payee || 'Opening balance', memo, num, status: status || 'R', ob: true, ik }); st.tx++; continue;
+          newTx({ accountId: acctId, date, amount, payee: payee || 'Beginsaldo', memo, num, status: status || 'R', ob: true, ik }); st.tx++; continue;
         }
         if (!hasSplits) {
           const single = r.splits && r.splits.length === 1 ? splitCatField(r.splits[0].S) : lf;
@@ -1877,46 +1877,46 @@ function viewImport() {
     planHTML = p.files.map((f, fi) => {
       const ex = f.sample ? parseQifDate(f.sample, f.dateOrder) : null;
       return `<div class="card" style="margin-top:16px"><h2>${esc(f.name)}</h2>
-      ${f.accounts.length ? '' : '<p class="muted">No bank, cash or credit-card transactions found in this file.</p>'}
+      ${f.accounts.length ? '' : '<p class="muted">Geen bank-, contant- of creditcardtransacties gevonden in dit bestand.</p>'}
       ${f.accounts.map((g, gi) => `<div style="border-top:1px solid var(--line);padding:12px 0">
-        <div style="margin-bottom:8px"><b>${esc(g.qifName)}</b> <span class="muted">· ${g.records.length.toLocaleString()} transactions${g.firstDate ? ` · ${esc(g.firstDate)} … ${esc(g.lastDate)}` : ''}</span></div>
+        <div style="margin-bottom:8px"><b>${esc(g.qifName)}</b> <span class="muted">· ${g.records.length.toLocaleString('nl-NL')} transacties${g.firstDate ? ` · ${esc(g.firstDate)} … ${esc(g.lastDate)}` : ''}</span></div>
         <div class="grid2">
-          <label style="margin:0">Import into<select data-imp="${fi}:${gi}:target">
-            <option value="new" ${g.target === 'new' ? 'selected' : ''}>A new account named…</option>
-            ${DB.accounts.map(a => `<option value="${a.id}" ${g.target === a.id ? 'selected' : ''}>Existing: ${esc(a.name)}</option>`).join('')}
-            <option value="skip" ${g.skip ? 'selected' : ''}>Don't import</option></select></label>
-          ${g.target === 'new' && !g.skip ? `<div class="grid2" style="gap:8px"><label style="margin:0">Name<input data-imp="${fi}:${gi}:newName" value="${esc(g.newName)}"></label>
-            <label style="margin:0">Kind<select data-imp="${fi}:${gi}:type">${ACCOUNT_TYPES.map(([k, l]) => `<option value="${k}" ${g.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>` : '<div></div>'}
+          <label style="margin:0">Importeren in<select data-imp="${fi}:${gi}:target">
+            <option value="new" ${g.target === 'new' ? 'selected' : ''}>Een nieuwe rekening met de naam…</option>
+            ${DB.accounts.map(a => `<option value="${a.id}" ${g.target === a.id ? 'selected' : ''}>Bestaande: ${esc(a.name)}</option>`).join('')}
+            <option value="skip" ${g.skip ? 'selected' : ''}>Niet importeren</option></select></label>
+          ${g.target === 'new' && !g.skip ? `<div class="grid2" style="gap:8px"><label style="margin:0">Naam<input data-imp="${fi}:${gi}:newName" value="${esc(g.newName)}"></label>
+            <label style="margin:0">Soort<select data-imp="${fi}:${gi}:type">${ACCOUNT_TYPES.map(([k, l]) => `<option value="${k}" ${g.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>` : '<div></div>'}
         </div></div>`).join('')}
       <div class="grid2" style="border-top:1px solid var(--line);padding-top:12px">
-        <label style="margin:0">Dates in this file are written as<select data-imp="${fi}:-:dateOrder">
-          <option value="DMY" ${f.dateOrder === 'DMY' ? 'selected' : ''}>day-month-year</option>
-          <option value="MDY" ${f.dateOrder === 'MDY' ? 'selected' : ''}>month/day/year (American)</option>
-          <option value="YMD" ${f.dateOrder === 'YMD' ? 'selected' : ''}>year-month-day</option></select>
-          <span class="hint">${f.detectedOrder ? 'Detected automatically. ' : 'Could not be detected for certain — please check. '}First date “${esc(f.sample)}” will become <b>${ex ? esc(fmtDate(ex)) : 'invalid'}</b>.</span></label>
-        <label style="margin:0">Amounts use<select data-imp="${fi}:-:comma"><option value="1" ${f.comma ? 'selected' : ''}>a decimal comma (12,50)</option><option value="0" ${!f.comma ? 'selected' : ''}>a decimal point (12.50)</option></select></label>
+        <label style="margin:0">Datums in dit bestand staan als<select data-imp="${fi}:-:dateOrder">
+          <option value="DMY" ${f.dateOrder === 'DMY' ? 'selected' : ''}>dag-maand-jaar</option>
+          <option value="MDY" ${f.dateOrder === 'MDY' ? 'selected' : ''}>maand/dag/jaar (Amerikaans)</option>
+          <option value="YMD" ${f.dateOrder === 'YMD' ? 'selected' : ''}>jaar-maand-dag</option></select>
+          <span class="hint">${f.detectedOrder ? 'Automatisch herkend. ' : 'Niet met zekerheid herkend — controleer dit. '}De eerste datum “${esc(f.sample)}” wordt <b>${ex ? esc(fmtDate(ex)) : 'ongeldig'}</b>.</span></label>
+        <label style="margin:0">Bedragen gebruiken<select data-imp="${fi}:-:comma"><option value="1" ${f.comma ? 'selected' : ''}>een decimale komma (12,50)</option><option value="0" ${!f.comma ? 'selected' : ''}>een decimale punt (12.50)</option></select></label>
       </div>
-      ${f.invst ? `<p class="hint">${f.invst} investment transactions are in this file; Kasboek does not handle investments, so they will be skipped.</p>` : ''}
-      ${f.cats.length ? `<p class="hint">Includes ${f.cats.length} category definitions.</p>` : ''}
+      ${f.invst ? `<p class="hint">Dit bestand bevat ${f.invst} beleggingstransacties; Kasboek ondersteunt geen beleggingen, dus die worden overgeslagen.</p>` : ''}
+      ${f.cats.length ? `<p class="hint">Bevat ${f.cats.length} categoriedefinities.</p>` : ''}
       </div>`;
-    }).join('') + `<div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn" data-act="imp-cancel">Cancel</button><button class="btn primary" data-act="imp-run">Import now</button></div>`;
+    }).join('') + `<div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn" data-act="imp-cancel">Annuleren</button><button class="btn primary" data-act="imp-run">Nu importeren</button></div>`;
   }
   return `<div class="page">
-    <div class="head"><div class="grow"><h1>Import from Microsoft Money</h1><p class="sub">Money can export each account as a QIF file. Kasboek reads those files, recreates your accounts and categories, and pairs up transfers between accounts so nothing is counted twice.</p></div></div>
+    <div class="head"><div class="grow"><h1>Importeren uit Microsoft Money</h1><p class="sub">Money kan elke rekening exporteren als QIF-bestand. Kasboek leest die bestanden, maakt uw rekeningen en categorieën opnieuw aan en koppelt overboekingen tussen rekeningen, zodat niets dubbel wordt geteld.</p></div></div>
     <div class="card">
-      <h2>1. Export from Money (on a Windows computer)</h2>
+      <h2>1. Exporteren uit Money (op een Windows-computer)</h2>
       <ol class="steps">
-        <li>Open your Money file and choose <b>File → Export</b>.</li>
-        <li>If Money asks for a format, choose <b>Loose QIF</b>. (If the result will not import, try <b>Strict QIF</b>.)</li>
-        <li>Choose one account and save the file, for example <i>Current account.qif</i>.</li>
-        <li>Repeat for <b>every</b> account, including savings, cash and credit cards. Transfers between them are matched automatically.</li>
-        <li>Copy the files to this Mac (USB stick, e-mail to yourself, or iCloud Drive).</li>
+        <li>Open uw Money-bestand en kies <b>Bestand → Exporteren</b>.</li>
+        <li>Vraagt Money om een indeling, kies dan <b>Loose QIF</b> (losse QIF). Lukt het importeren daarna niet, probeer dan <b>Strict QIF</b>.</li>
+        <li>Kies één rekening en sla het bestand op, bijvoorbeeld <i>Betaalrekening.qif</i>.</li>
+        <li>Herhaal dit voor <b>elke</b> rekening, ook spaarrekeningen, kas en creditcards. Overboekingen daartussen worden automatisch gekoppeld.</li>
+        <li>Zet de bestanden op deze computer (USB-stick, e-mail aan uzelf, of iCloud Drive / OneDrive).</li>
       </ol>
-      <details style="margin-top:10px"><summary>No Windows computer with Money any more?</summary>
-        <p class="sub">Money needs Windows to run. Options: use an old PC one last time, ask someone with Windows to do the export, or install Windows in a virtual machine on your Mac (for example Parallels Desktop or VMware Fusion) and install Money there. Your <i>.mny</i> file itself cannot be read directly by Kasboek.</p></details>
-      <h2 style="margin-top:20px">2. Choose the files</h2>
-      <p class="sub" style="margin-top:0">You can select several files at once. Importing the same file twice is safe: transactions already imported are skipped.</p>
-      <div class="row" style="margin-top:10px"><button class="btn primary" data-act="pick-qif">Choose QIF files…</button></div>
+      <details style="margin-top:10px"><summary>Geen Windows-computer met Money meer?</summary>
+        <p class="sub">Money werkt alleen onder Windows. Mogelijkheden: gebruik een oude pc nog één keer, vraag iemand met Windows om de export te doen, of installeer Windows in een virtuele machine op uw Mac (bijvoorbeeld Parallels Desktop of VMware Fusion) en installeer Money daarin. Het <i>.mny</i>-bestand zelf kan Kasboek niet rechtstreeks lezen.</p></details>
+      <h2 style="margin-top:20px">2. Kies de bestanden</h2>
+      <p class="sub" style="margin-top:0">U kunt meerdere bestanden tegelijk kiezen. Hetzelfde bestand twee keer importeren kan geen kwaad: transacties die al geïmporteerd zijn, worden overgeslagen.</p>
+      <div class="row" style="margin-top:10px"><button class="btn primary" data-act="pick-qif">QIF-bestanden kiezen…</button></div>
     </div>
     ${planHTML}
   </div>`;
@@ -1929,20 +1929,20 @@ function makeSample() {
   const keep = DB.settings;
   DB = emptyDB(); DB.settings = keep;
   const A = (name, type, note) => { const a = { id: uid(), name, type, note: note || '', closed: false }; DB.accounts.push(a); return a.id; };
-  const chk = A('Current account', 'checking'), sav = A('Savings account', 'savings'), cc = A('Credit card', 'credit'), cash = A('Cash', 'cash');
+  const chk = A('Betaalrekening', 'checking'), sav = A('Spaarrekening', 'savings'), cc = A('Creditcard', 'credit'), cash = A('Kas', 'cash');
   const C = (p, k) => findOrCreateCategory(p, k).cat.id;
   const cat = {
-    salary: C('Salary', 'income'), interest: C('Interest', 'income'), mort: C('Housing : Mortgage', 'expense'), energy: C('Utilities : Energy'), water: C('Utilities : Water'), net: C('Utilities : Internet & phone'),
-    groc: C('Food : Groceries'), dine: C('Food : Dining out'), fuel: C('Car : Fuel'), carins: C('Car : Insurance'), health: C('Insurance : Health'), home: C('Insurance : Home'), cloth: C('Clothing'),
-    gifts: C('Gifts'), hol: C('Holidays'), books: C('Leisure : Books & music'), cult: C('Leisure : Culture'), pharm: C('Health : Pharmacy'), tax: C('Taxes : Municipal'),
+    salary: C('Salaris', 'income'), interest: C('Rente', 'income'), mort: C('Wonen : Hypotheek', 'expense'), energy: C('Vaste lasten : Energie'), water: C('Vaste lasten : Water'), net: C('Vaste lasten : Internet & telefoon'),
+    groc: C('Eten : Boodschappen'), dine: C('Eten : Uit eten'), fuel: C('Auto : Brandstof'), carins: C('Auto : Verzekering'), health: C('Verzekeringen : Zorg'), home: C('Verzekeringen : Woning'), cloth: C('Kleding'),
+    gifts: C('Cadeaus'), hol: C('Vakanties'), books: C('Vrije tijd : Boeken & muziek'), cult: C('Vrije tijd : Cultuur'), pharm: C('Gezondheid : Drogist'), tax: C('Belastingen : Gemeente'),
   };
   const now = todayISO().slice(0, 7);
   const start = addMonths(now, -23);
   const st = date => { const ago = monthsBetween(date.slice(0, 7), now).length - 1; return ago >= 2 ? 'R' : ago === 1 ? 'c' : ''; };
   const T = (acc, date, amount, payee, catId, extra) => { if (date > todayISO()) return null; const t = newTx(Object.assign({ accountId: acc, date, amount, payee, categoryId: catId || null, status: st(date) }, extra || {})); if (t.transferAccountId || t.splits) syncLegs(t); return t; };
-  newTx({ accountId: chk, date: start + '-01', amount: 245000, payee: 'Opening balance', ob: true, status: 'R' });
-  newTx({ accountId: sav, date: start + '-01', amount: 1200000, payee: 'Opening balance', ob: true, status: 'R' });
-  newTx({ accountId: cash, date: start + '-01', amount: 6000, payee: 'Opening balance', ob: true, status: 'R' });
+  newTx({ accountId: chk, date: start + '-01', amount: 245000, payee: 'Beginsaldo', ob: true, status: 'R' });
+  newTx({ accountId: sav, date: start + '-01', amount: 1200000, payee: 'Beginsaldo', ob: true, status: 'R' });
+  newTx({ accountId: cash, date: start + '-01', amount: 6000, payee: 'Beginsaldo', ob: true, status: 'R' });
   let ccOwed = 0;
   for (const m of monthsBetween(start, now)) {
     const [y, mo] = m.split('-').map(Number);
@@ -1952,22 +1952,22 @@ function makeSample() {
     T(chk, d(8), -5450, 'KPN', cat.net);
     if (mo % 3 === 1) T(chk, d(9), -6200, 'Vitens', cat.water);
     T(chk, d(12), -14290, 'Zilveren Kruis', cat.health);
-    T(chk, d(14), -2875, 'Centraal Beheer', null, { splits: [{ categoryId: cat.home, transferAccountId: null, memo: 'Home insurance', amount: -1850 }, { categoryId: cat.carins, transferAccountId: null, memo: 'Car insurance', amount: -1025 }] });
-    if (mo === 3) T(chk, d(28), -38600, 'Gemeente Nijmegen', cat.tax, { memo: 'Municipal taxes' });
+    T(chk, d(14), -2875, 'Centraal Beheer', null, { splits: [{ categoryId: cat.home, transferAccountId: null, memo: 'Woonverzekering', amount: -1850 }, { categoryId: cat.carins, transferAccountId: null, memo: 'Autoverzekering', amount: -1025 }] });
+    if (mo === 3) T(chk, d(28), -38600, 'Gemeente Nijmegen', cat.tax, { memo: 'Gemeentelijke belastingen' });
     for (let w = 0; w < 4; w++) T(chk, d(2 + w * 7), -between(48, 135), rnd() < .6 ? 'Albert Heijn' : 'Jumbo', cat.groc);
     for (let k = 0; k < 2; k++) T(chk, d(5 + k * 12), -between(55, 85), 'Shell', cat.fuel);
     if (rnd() < .5) T(chk, d(17), -between(8, 35), 'Kruidvat', cat.pharm);
-    T(chk, d(25), 345000, 'Radboud Universiteit', cat.salary, { memo: 'Salary' });
-    if (mo === 5) T(chk, d(25), 268000, 'Radboud Universiteit', cat.salary, { memo: 'Holiday allowance' });
-    T(chk, d(26), -40000, 'Monthly savings', null, { transferAccountId: sav });
-    T(chk, d(6), -10000, 'ATM withdrawal', null, { transferAccountId: cash });
-    for (let k = 0; k < 3; k++) T(cash, d(7 + k * 6), -between(6, 28), ['Bakker Bart', 'Market', 'Café De Plak'][k], k === 2 ? cat.dine : cat.groc);
-    if (ccOwed > 0) { T(chk, d(15), -ccOwed, 'Credit card payment', null, { transferAccountId: cc }); }
+    T(chk, d(25), 345000, 'Radboud Universiteit', cat.salary, { memo: 'Salaris' });
+    if (mo === 5) T(chk, d(25), 268000, 'Radboud Universiteit', cat.salary, { memo: 'Vakantiegeld' });
+    T(chk, d(26), -40000, 'Maandelijks sparen', null, { transferAccountId: sav });
+    T(chk, d(6), -10000, 'Geldautomaat', null, { transferAccountId: cash });
+    for (let k = 0; k < 3; k++) T(cash, d(7 + k * 6), -between(6, 28), ['Bakker Bart', 'Markt', 'Café De Plak'][k], k === 2 ? cat.dine : cat.groc);
+    if (ccOwed > 0) { T(chk, d(15), -ccOwed, 'Afschrijving creditcard', null, { transferAccountId: cc }); }
     ccOwed = 0;
     const buys = [['Bol.com', cat.books, 15, 60], ['Restaurant De Hemel', cat.dine, 45, 120], ['H&M', cat.cloth, 30, 110], ['Stadsschouwburg', cat.cult, 40, 90]];
     for (const [p, c, lo, hi] of buys) { if (rnd() < .7) { const t = T(cc, d(4 + Math.floor(rnd() * 22)), -between(lo, hi), p, c); if (t) ccOwed += -t.amount; } }
-    if (mo === 7) { const t = T(cc, d(10), -164500, 'Booking.com', cat.hol, { memo: 'Summer holiday' }); if (t) ccOwed += 164500; }
-    if (mo === 12) { const t = T(cc, d(15), -between(150, 260), 'Gifts', cat.gifts); if (t) ccOwed += -t.amount; T(sav, d(31), between(90, 140), 'Interest', cat.interest); }
+    if (mo === 7) { const t = T(cc, d(10), -164500, 'Booking.com', cat.hol, { memo: 'Zomervakantie' }); if (t) ccOwed += 164500; }
+    if (mo === 12) { const t = T(cc, d(15), -between(150, 260), 'Cadeaus', cat.gifts); if (t) ccOwed += -t.amount; T(sav, d(31), between(90, 140), 'Rente', cat.interest); }
   }
   _idx = null; changed();
 }
@@ -2035,10 +2035,10 @@ document.addEventListener('click', async e => {
     return render();
   }
   if (d.rdrill != null) { reportState.drill = d.rdrill || null; reportState.drill2 = null; return render(); }
-  if (d.catSub) { const p = idx().cat.get(d.catSub); const n = await promptBox('New subcategory of ' + p.name, 'Name', ''); if (n) { findOrCreateCategory(p.name + ':' + n.replace(/:/g, ' '), p.kind); changed(); render(); } return; }
+  if (d.catSub) { const p = idx().cat.get(d.catSub); const n = await promptBox('Nieuwe subcategorie van ' + p.name, 'Naam', ''); if (n) { findOrCreateCategory(p.name + ':' + n.replace(/:/g, ' '), p.kind); changed(); render(); } return; }
   if (d.catRen) {
-    const c = idx().cat.get(d.catRen); const n = await promptBox('Rename category', 'New name', c.name);
-    if (n) { const clash = DB.categories.find(x => x !== c && x.parentId === c.parentId && x.name.toLowerCase() === n.toLowerCase()); if (clash) return alertBox('Name already used', 'Another category already has this name. To merge them, delete one and move its transactions to the other.'); c.name = n.replace(/:/g, ' '); changed(); render(); } return;
+    const c = idx().cat.get(d.catRen); const n = await promptBox('Categorie hernoemen', 'Nieuwe naam', c.name);
+    if (n) { const clash = DB.categories.find(x => x !== c && x.parentId === c.parentId && x.name.toLowerCase() === n.toLowerCase()); if (clash) return alertBox('Naam al in gebruik', 'Een andere categorie heeft deze naam al. Om ze samen te voegen verwijdert u er één en verplaatst u de transacties naar de andere.'); c.name = n.replace(/:/g, ' '); changed(); render(); } return;
   }
   if (d.catKind) { const c = idx().cat.get(d.catKind); c.kind = c.kind === 'expense' ? 'income' : 'expense'; for (const s of (idx().childrenOf.get(c.id) || [])) s.kind = c.kind; changed(); render(); return; }
   if (d.catDel) return deleteCategory(d.catDel);
@@ -2049,13 +2049,13 @@ document.addEventListener('click', async e => {
     case 'new-tx-any': {
       const accs = DB.accounts.filter(a => !a.closed);
       if (accs.length === 1) return openTxEditor(null, accs[0].id);
-      const w = openModal({ title: 'Which account?', body: `<div class="cards" style="gap:6px">${accs.map(a => `<button class="bigbtn" data-pick="${a.id}" style="padding:10px 14px"><b style="margin:0">${esc(a.name)}</b></button>`).join('')}</div>` });
+      const w = openModal({ title: 'Welke rekening?', body: `<div class="cards" style="gap:6px">${accs.map(a => `<button class="bigbtn" data-pick="${a.id}" style="padding:10px 14px"><b style="margin:0">${esc(a.name)}</b></button>`).join('')}</div>` });
       $$('[data-pick]', w).forEach(b => b.onclick = () => { closeModal(w); openTxEditor(null, b.dataset.pick); });
       return;
     }
     case 'show-more': regState.shown += 500; return render();
     case 'reg-csv': return exportRegisterCSV();
-    case 'report-csv': if (reportState._csv) downloadCSV('Kasboek report ' + todayISO() + '.csv', reportState._csv); return;
+    case 'report-csv': if (reportState._csv) downloadCSV('Kasboek rapport ' + todayISO() + '.csv', reportState._csv); return;
     case 'print': return window.print();
     case 'recon-start': return startReconcile();
     case 'recon-finish': return finishReconcile('finish');
@@ -2065,8 +2065,8 @@ document.addEventListener('click', async e => {
       const all = idx().byAcc.get(recon.accountId) || [];
       const cleared = all.filter(t => t.status === 'R').reduce((s, t) => s + t.amount, 0) + all.filter(t => recon.checked.has(t.id)).reduce((s, t) => s + t.amount, 0);
       const diff = recon.ending - cleared;
-      if (!await confirmBox('Finish with an adjustment?', `<p>Kasboek and your statement differ by <b>${esc(money(diff))}</b>. Kasboek can add a “Balance adjustment” transaction of that amount so the account matches the statement.</p><p>It is usually better to look for the missing or mistyped transaction first.</p>`, 'Add adjustment and finish')) return;
-      const t = newTx({ accountId: recon.accountId, date: recon.date, amount: diff, payee: 'Balance adjustment', memo: 'Added when reconciling', status: '' });
+      if (!await confirmBox('Afronden met een correctie?', `<p>Kasboek en uw afschrift verschillen <b>${esc(money(diff))}</b>. Kasboek kan een transactie “Saldocorrectie” van dat bedrag toevoegen, zodat de rekening klopt met het afschrift.</p><p>Meestal is het beter eerst de ontbrekende of verkeerd ingevoerde transactie te zoeken.</p>`, 'Correctie toevoegen en afronden')) return;
+      const t = newTx({ accountId: recon.accountId, date: recon.date, amount: diff, payee: 'Saldocorrectie', memo: 'Toegevoegd bij afstemmen', status: '' });
       recon.checked.add(t.id); _idx = null;
       return finishReconcile('finish');
     }
@@ -2085,32 +2085,32 @@ document.addEventListener('click', async e => {
     case 'imp-run': {
       const st = runImport(importPlan); importPlan = null;
       go('home');
-      alertBox('Import finished', `<p><b>${st.tx.toLocaleString()}</b> transactions imported${st.matched ? `, <b>${st.matched.toLocaleString()}</b> transfers matched with the other account` : ''}.</p>
-        ${st.newAccounts.length ? `<p>New accounts: ${st.newAccounts.map(esc).join(', ')}.</p>` : ''}
-        ${st.autoAccounts.length ? `<p>These accounts were only mentioned in transfers, so they were created with just those transfers: <b>${st.autoAccounts.map(esc).join(', ')}</b>. Import their own QIF files too to complete them.</p>` : ''}
-        ${st.cats ? `<p>${st.cats} categories created.</p>` : ''}
-        ${st.dupes ? `<p>${st.dupes.toLocaleString()} transactions were already in Kasboek and were skipped.</p>` : ''}
-        ${st.badDates ? `<p class="neg">${st.badDates} transactions had an unreadable date and were skipped.</p>` : ''}
-        ${st.invst ? `<p class="muted">${st.invst} investment transactions were skipped.</p>` : ''}
-        <p>Tip: check each account's balance against Money or your bank, then save a backup file.</p>`);
+      alertBox('Importeren voltooid', `<p><b>${st.tx.toLocaleString('nl-NL')}</b> transacties geïmporteerd${st.matched ? `, <b>${st.matched.toLocaleString('nl-NL')}</b> overboekingen gekoppeld aan de andere rekening` : ''}.</p>
+        ${st.newAccounts.length ? `<p>Nieuwe rekeningen: ${st.newAccounts.map(esc).join(', ')}.</p>` : ''}
+        ${st.autoAccounts.length ? `<p>Deze rekeningen kwamen alleen voor in overboekingen en zijn daarom aangemaakt met alleen die overboekingen: <b>${st.autoAccounts.map(esc).join(', ')}</b>. Importeer ook hun eigen QIF-bestanden om ze compleet te maken.</p>` : ''}
+        ${st.cats ? `<p>${st.cats} categorieën aangemaakt.</p>` : ''}
+        ${st.dupes ? `<p>${st.dupes.toLocaleString('nl-NL')} transacties stonden al in Kasboek en zijn overgeslagen.</p>` : ''}
+        ${st.badDates ? `<p class="neg">${st.badDates} transacties hadden een onleesbare datum en zijn overgeslagen.</p>` : ''}
+        ${st.invst ? `<p class="muted">${st.invst} beleggingstransacties zijn overgeslagen.</p>` : ''}
+        <p>Tip: vergelijk het saldo van elke rekening met Money of uw bank en sla daarna een reservekopie op.</p>`);
       return;
     }
     case 'cat-add': {
-      const n = await promptBox('New category', 'Category name', '', 'Use “Food : Groceries” for a subcategory');
+      const n = await promptBox('Nieuwe categorie', 'Naam van de categorie', '', 'Gebruik “Eten : Boodschappen” voor een subcategorie');
       if (!n) return;
-      const isInc = await confirmBox('Income or expense?', `<p>Is “${esc(n)}” a category for <b>income</b>? Choose Cancel for an expense category.</p>`, 'Income');
+      const isInc = await confirmBox('Inkomsten of uitgaven?', `<p>Is “${esc(n)}” een categorie voor <b>inkomsten</b>? Kies Annuleren voor een categorie voor uitgaven.</p>`, 'Inkomsten');
       findOrCreateCategory(n, isInc ? 'income' : 'expense'); changed(); return render();
     }
     case 'erase': {
-      if (!await confirmBox('Erase all data?', fileHandle && fileStatus === 'ok' ? '<p><b>You are using a shared data file.</b> This removes every account, category and transaction from that file, so also from the other computer. Backup files you saved are not affected.</p>' : '<p>This removes every account, category and transaction from Kasboek on this computer. Backup files you saved are not affected.</p>', 'Erase everything', true)) return;
+      if (!await confirmBox('Alle gegevens wissen?', fileHandle && fileStatus === 'ok' ? '<p><b>U gebruikt een gedeeld gegevensbestand.</b> Hiermee verwijdert u alle rekeningen, categorieën en transacties uit dat bestand, dus ook op de andere computer. Reservekopieën die u hebt opgeslagen blijven bestaan.</p>' : '<p>Hiermee verwijdert u alle rekeningen, categorieën en transacties uit Kasboek op deze computer. Reservekopieën die u hebt opgeslagen blijven bestaan.</p>', 'Alles wissen', true)) return;
       const keep = DB.settings; DB = emptyDB(); DB.settings = keep; changed(); return go('home');
     }
   }
 });
 $('#file-qif').addEventListener('change', async e => {
   const files = Array.from(e.target.files || []); if (!files.length) return;
-  try { importPlan = await readQifFiles(files); } catch (err) { importPlan = null; alertBox('Could not read the file', esc(err.message)); }
-  if (importPlan && !importPlan.files.some(f => f.accounts.length)) { alertBox('Nothing to import', 'No bank, cash or credit-card transactions were found. Are these QIF files exported from Money?'); importPlan = null; }
+  try { importPlan = await readQifFiles(files); } catch (err) { importPlan = null; alertBox('Het bestand kan niet worden gelezen', esc(err.message)); }
+  if (importPlan && !importPlan.files.some(f => f.accounts.length)) { alertBox('Niets om te importeren', 'Er zijn geen bank-, contant- of creditcardtransacties gevonden. Zijn dit QIF-bestanden die uit Money zijn geëxporteerd?'); importPlan = null; }
   render();
 });
 
