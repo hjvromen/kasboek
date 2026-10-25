@@ -167,6 +167,10 @@ summary{cursor:pointer}
 .badge{margin-left:auto;font-size:12px;font-weight:600;background:var(--warn-bg);color:var(--warn-ink);border-radius:20px;padding:1px 8px;font-variant-numeric:tabular-nums}
 .nav.on .badge{background:rgba(255,255,255,.25);color:var(--accent-ink)}
 .banner.info{background:var(--accent-soft);color:var(--ink);border-color:transparent}
+.kpbar{position:static}
+tr.matched td{color:var(--muted)}
+tr.kpsel td{background:var(--accent-soft)}
+.btn:disabled{opacity:.45;cursor:default}
 .splitsum{font-size:14px;color:var(--ink-2);display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 .hbars{display:flex;flex-direction:column;gap:2px}
 .hbar{display:grid;grid-template-columns:minmax(90px,200px) minmax(40px,1fr) auto 40px;gap:12px;align-items:center;border:0;background:none;padding:6px 6px;border-radius:7px;text-align:left;cursor:default;width:100%}
@@ -250,7 +254,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.16 (oktober 2026)';
+const APP_VERSION = '1.17 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -1017,6 +1021,55 @@ function viewHome() {
 }
 
 /* ---------- Account register ---------- */
+/* ---------- Afletteren: open items on accounts such as Kruisposten ---------- */
+const kpState = { acc: null, sel: new Set(), view: 'open' };
+const usesOpenItems = a => a && (a.openItems === true || (a.openItems == null && /kruispost|tussenrekening|vraagpost/i.test(a.name)));
+function kpBar(a, all) {
+  if (kpState.acc !== a.id) { kpState.acc = a.id; kpState.sel = new Set(); kpState.view = 'open'; }
+  const open = all.filter(t => !t.match);
+  const openSum = open.reduce((s, t) => s + t.amount, 0);
+  const sel = all.filter(t => kpState.sel.has(t.id) && !t.match);
+  const selSum = sel.reduce((s, t) => s + t.amount, 0);
+  return `<div class="recon kpbar">
+    <div class="seg seg-inline"><button data-kpview="open" class="${kpState.view === 'open' ? 'on' : ''}">Open posten</button><button data-kpview="all" class="${kpState.view === 'all' ? 'on' : ''}">Alle</button></div>
+    <div><div class="k">Open posten</div><div class="v">${open.length.toLocaleString('nl-NL')} · ${esc(money(openSum))}</div></div>
+    <div><div class="k">Aangevinkt</div><div class="v">${sel.length} · <span class="${selSum ? 'neg' : ''}">${esc(money(selSum))}</span></div></div>
+    <span class="spacer"></span>
+    ${sel.length ? `<button class="btn ${selSum === 0 && sel.length > 1 ? 'primary' : ''}" data-act="kp-link" ${selSum === 0 && sel.length > 1 ? '' : 'disabled'}>Koppelen</button><button class="btn" data-act="kp-clear">Vinkjes wissen</button>` : ''}
+    <button class="btn" data-act="kp-auto">Gelijke bedragen automatisch koppelen…</button>
+    <div style="flex-basis:100%;font-size:13px;color:var(--ink-2)">Vink posten aan die samen ${esc(money(0))} zijn en klik op Koppelen; ze verdwijnen dan uit de open posten. Klik op 🔗 bij een gekoppelde post om de koppeling weer los te maken.</div>
+  </div>`;
+}
+function kpLink(a) {
+  const all = idx().byAcc.get(a.id) || [];
+  const sel = all.filter(t => kpState.sel.has(t.id) && !t.match);
+  if (sel.length < 2 || sel.reduce((s, t) => s + t.amount, 0) !== 0) return;
+  const g = uid(); for (const t of sel) t.match = g;
+  kpState.sel = new Set(); changed(); render();
+  toast(sel.length + ' posten gekoppeld.');
+}
+function kpAutoPairs(a) {
+  const open = (idx().byAcc.get(a.id) || []).filter(t => !t.match && t.amount);
+  const byAmt = new Map();
+  for (const t of open) { const k = Math.abs(t.amount); if (!byAmt.has(k)) byAmt.set(k, { pos: [], neg: [] }); byAmt.get(k)[t.amount > 0 ? 'pos' : 'neg'].push(t); }
+  const pairs = [];
+  for (const { pos, neg } of byAmt.values()) {
+    pos.sort(cmpTx); neg.sort(cmpTx);
+    // pair each post with the nearest-in-time opposite post of the same amount
+    const used = new Set();
+    for (const p of pos) {
+      let best = null, bd = Infinity;
+      for (const n of neg) { if (used.has(n.id)) continue; const d = Math.abs(Date.parse(p.date) - Date.parse(n.date)); if (d < bd) { bd = d; best = n; } }
+      if (best) { used.add(best.id); pairs.push([p, best]); }
+    }
+  }
+  return pairs;
+}
+function kpUnlink(id) {
+  const t = idx().tx.get(id); if (!t || !t.match) return;
+  const g = t.match; for (const x of DB.transactions) if (x.match === g) delete x.match;
+  changed(); render();
+}
 function viewRegister() {
   const I = idx();
   const a = I.acc.get(state.accountId);
@@ -1028,7 +1081,7 @@ function viewRegister() {
   const clearedBal = all.reduce((s, t) => s + (t.status ? t.amount : 0), 0);
   const debt = isDebtType(a.type);
   let rows;
-  let reconHTML = '';
+  let reconHTML = '', kpHTML = '';
   if (recon && recon.accountId === a.id) {
     rows = all.filter(t => t.status !== 'R' && t.date <= recon.date).slice().reverse();
     const opening = all.filter(t => t.status === 'R').reduce((s, t) => s + t.amount, 0);
@@ -1049,25 +1102,27 @@ function viewRegister() {
     const [from, to] = periodRange(regState.period, regState.custom);
     const q = regState.search.trim().toLowerCase();
     rows = all.filter(t => t.date >= from && t.date <= to);
+    if (usesOpenItems(a)) { reconHTML = ''; kpHTML = kpBar(a, all); if (kpState.view === 'open') rows = rows.filter(t => !t.match); }
     if (q) rows = rows.filter(t => (t.payee + ' ' + t.memo + ' ' + t.num + ' ' + txCategoryText(t) + ' ' + moneyPlain(Math.abs(t.amount)) + ' ' + money(t.amount)).toLowerCase().includes(q));
     rows = rows.slice().reverse();
   }
   const shown = rows.slice(0, regState.shown);
-  const inRecon = !!reconHTML;
+  const inRecon = !!reconHTML, kp = !!kpHTML;
   const body = shown.map(t => {
     const st = t.status || '';
     const stCell = inRecon
       ? `<input type="checkbox" data-recon="${t.id}" ${recon.checked.has(t.id) ? 'checked' : ''} aria-label="Afgevinkt">`
       : `<button class="stbtn ${st}" data-status="${t.id}" title="${st === 'R' ? 'Afgestemd' : st === 'c' ? 'Verwerkt door de bank — klik om dit ongedaan te maken' : 'Nog niet verwerkt — klik om te markeren als verwerkt door de bank'}">${st === 'R' ? 'R' : st === 'c' ? 'c' : '·'}</button>`;
-    return `<tr class="click" data-tx="${t.id}">
-      <td class="st">${stCell}</td>
+    const kpCell = !kp ? '' : t.match ? `<td class="st"><button class="stbtn" data-kpun="${t.id}" title="Gekoppeld — klik om los te koppelen">🔗</button></td>` : `<td class="st"><input type="checkbox" data-kp="${t.id}" ${kpState.sel.has(t.id) ? 'checked' : ''} aria-label="Aanvinken om te koppelen"></td>`;
+    return `<tr class="click ${t.match && kp ? 'matched' : ''} ${kpState.sel.has(t.id) && kp ? 'kpsel' : ''}" data-tx="${t.id}">
+      ${kpCell}<td class="st">${stCell}</td>
       <td style="white-space:nowrap">${fmtDate(t.date)}</td>
       <td class="numcol muted">${esc(t.num)}</td>
       <td>${esc(t.payee) || '<span class="muted">—</span>'}${t.memo ? `<div class="hint">${esc(t.memo)}</div>` : ''}</td>
       <td class="cat">${txCategoryLabel(t)}</td>
       <td class="num">${t.amount < 0 ? esc(money(-t.amount)) : ''}</td>
       <td class="num">${t.amount > 0 ? esc(money(t.amount)) : ''}</td>
-      ${inRecon ? '' : `<td class="num">${moneyHTML(runBal.get(t.id))}</td>`}
+      ${inRecon || (kp && kpState.view === 'open') ? '' : `<td class="num">${moneyHTML(runBal.get(t.id))}</td>`}
     </tr>`;
   }).join('');
   const typeLabel = (ACCOUNT_TYPES.find(x => x[0] === a.type) || ['', ''])[1];
@@ -1079,7 +1134,7 @@ function viewRegister() {
       ${inRecon ? '' : '<button class="btn" data-act="recon-start">Afstemmen…</button>'}
       <button class="btn primary" data-act="new-tx">+ Nieuwe transactie</button>
     </div>
-    ${reconHTML}
+    ${reconHTML}${kpHTML}
     ${inRecon ? '' : `<div class="toolbar">
       <input type="search" id="reg-search" placeholder="Zoek op begunstigde, notitie, categorie, bedrag…" value="${esc(regState.search)}">
       <select id="reg-period">${PERIODS.map(([k, l]) => `<option value="${k}" ${regState.period === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
@@ -1089,9 +1144,9 @@ function viewRegister() {
       <button class="btn small" data-act="reg-csv">Exporteren naar spreadsheet</button>
     </div>`}
     <div class="card" style="padding:4px 6px">
-    ${rows.length ? `<table class="t reg"><thead><tr><th class="st" title="Status">${inRecon ? '✓' : 'C'}</th><th>Datum</th><th class="numcol">Nr.</th><th>Begunstigde / notitie</th><th>Categorie</th><th class="num">Af</th><th class="num">Bij</th>${inRecon ? '' : '<th class="num">Saldo</th>'}</tr></thead><tbody>${body}</tbody></table>
+    ${rows.length ? `<table class="t reg"><thead><tr>${kp ? '<th class="st" title="Afletteren">🔗</th>' : ''}<th class="st" title="Status">${inRecon ? '✓' : 'C'}</th><th>Datum</th><th class="numcol">Nr.</th><th>Begunstigde / notitie</th><th>Categorie</th><th class="num">Af</th><th class="num">Bij</th>${inRecon || (kp && kpState.view === 'open') ? '' : '<th class="num">Saldo</th>'}</tr></thead><tbody>${body}</tbody></table>
       ${rows.length > shown.length ? `<div class="more"><button class="btn" data-act="show-more">Oudere transacties tonen (nog ${(rows.length - shown.length).toLocaleString('nl-NL')})</button></div>` : ''}`
-    : `<p class="muted" style="padding:18px">${all.length ? 'Geen transacties gevonden.' : 'Nog geen transacties. Klik op “Nieuwe transactie” om er een toe te voegen.'}</p>`}
+    : `<p class="muted" style="padding:18px">${all.length ? (kp && kpState.view === 'open' ? 'Er staan geen open posten meer. 🎉' : 'Geen transacties gevonden.') : 'Nog geen transacties. Klik op “Nieuwe transactie” om er een toe te voegen.'}</p>`}
     </div>
   </div>`;
 }
@@ -1388,6 +1443,7 @@ function openAccountEditor(acc) {
       <label>Op datum<input type="date" name="obdate" value="${todayISO()}"></label></div>` : ''}
     <label>IBAN <span class="hint">optioneel; nodig om overboekingen tussen uw rekeningen bij het importeren te herkennen</span><input name="iban" value="${esc(a.iban || '')}" placeholder="NL00 BANK 0123 4567 89" autocomplete="off"></label>
     <label>Opmerking <span class="hint">optioneel</span><input name="note" value="${esc(a.note || '')}"></label>
+    <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="openitems" ${usesOpenItems(a) ? 'checked' : ''} style="width:auto;min-height:0"> Open posten bijhouden (afletteren), bijvoorbeeld voor kruisposten</label>
     ${!isNew ? `<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="closed" ${a.closed ? 'checked' : ''} style="width:auto;min-height:0"> Deze rekening is opgeheven (niet meer in de lijst tonen)</label>` : ''}
     <div class="err"></div>
     <div class="modal-actions">${!isNew ? '<button type="button" class="btn danger" data-del>Rekening verwijderen</button>' : ''}<span class="spacer"></span><button type="button" class="btn" data-close>Annuleren</button><button class="btn primary">${isNew ? 'Rekening toevoegen' : 'Opslaan'}</button></div>
@@ -1402,14 +1458,14 @@ function openAccountEditor(acc) {
     if (!name) { $('.err', w).textContent = 'Vul een naam in.'; return; }
     if (DB.accounts.some(x => x !== acc && x.name.toLowerCase() === name.toLowerCase())) { $('.err', w).textContent = 'Er is al een rekening met deze naam.'; return; }
     if (isNew) {
-      const na = { id: uid(), name, type: f.type.value, note: f.note.value.trim(), iban: normIban(f.iban.value), closed: false };
+      const na = { id: uid(), name, type: f.type.value, note: f.note.value.trim(), iban: normIban(f.iban.value), openItems: f.openitems.checked, closed: false };
       DB.accounts.push(na);
       let ob = parseUserAmount(f.ob.value) || 0;
       if (isDebtType(na.type)) ob = -Math.abs(ob);
       if (ob) newTx({ accountId: na.id, date: f.obdate.value || todayISO(), amount: ob, payee: 'Beginsaldo', ob: true, status: 'R' });
       changed(); closeModal(w); go('account', { accountId: na.id });
     } else {
-      Object.assign(acc, { name, type: f.type.value, note: f.note.value.trim(), iban: normIban(f.iban.value), closed: f.closed.checked });
+      Object.assign(acc, { name, type: f.type.value, note: f.note.value.trim(), iban: normIban(f.iban.value), openItems: f.openitems.checked, closed: f.closed.checked });
       changed(); closeModal(w); render();
     }
   };
@@ -2683,9 +2739,12 @@ function afterRender() {
 }
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-go],[data-acc],[data-act],[data-tx],[data-status],[data-recon],[data-rtype],[data-drill],[data-rdrill],[data-cat-sub],[data-cat-ren],[data-cat-kind],[data-cat-del]');
+  const el = e.target.closest('[data-kp],[data-kpun],[data-kpview],[data-go],[data-acc],[data-act],[data-tx],[data-status],[data-recon],[data-rtype],[data-drill],[data-rdrill],[data-cat-sub],[data-cat-ren],[data-cat-kind],[data-cat-del]');
   if (!el || el.closest('.modal')) return;
   const d = el.dataset;
+  if (d.kp) { e.stopPropagation(); if (e.target.checked) kpState.sel.add(d.kp); else kpState.sel.delete(d.kp); return render(); }
+  if (d.kpun) { e.stopPropagation(); if (await confirmBox('Koppeling losmaken?', '<p>De gekoppelde posten komen weer bij de open posten te staan.</p>', 'Losmaken')) kpUnlink(d.kpun); return; }
+  if (d.kpview) { kpState.view = d.kpview; return render(); }
   if (d.go) return go(d.go);
   if (d.status) {
     e.stopPropagation();
@@ -2720,6 +2779,16 @@ document.addEventListener('click', async e => {
   if (d.catKind) { const c = idx().cat.get(d.catKind); c.kind = c.kind === 'expense' ? 'income' : 'expense'; for (const s of (idx().childrenOf.get(c.id) || [])) s.kind = c.kind; changed(); render(); return; }
   if (d.catDel) return deleteCategory(d.catDel);
   switch (d.act) {
+    case 'kp-link': return kpLink(idx().acc.get(state.accountId));
+    case 'kp-clear': kpState.sel = new Set(); return render();
+    case 'kp-auto': {
+      const a = idx().acc.get(state.accountId), pairs = kpAutoPairs(a);
+      if (!pairs.length) return alertBox('Niets om automatisch te koppelen', '<p>Er zijn geen open posten met hetzelfde bedrag en een tegengesteld teken.</p>');
+      const ex = pairs.slice(0, 6).map(([p, n]) => `<tr><td>${fmtDate(n.date)} ${esc(n.payee)}</td><td class="num">${moneyHTML(n.amount)}</td><td>${fmtDate(p.date)} ${esc(p.payee)}</td><td class="num">${moneyHTML(p.amount)}</td></tr>`).join('');
+      if (!await confirmBox('Gelijke bedragen koppelen?', `<p>Kasboek heeft <b>${pairs.length}</b> paren gevonden van een post en een tegenpost met hetzelfde bedrag (steeds de dichtstbijzijnde in tijd). Bijvoorbeeld:</p><table class="t" style="font-size:13px">${ex}</table><p class="hint">Een verkeerde koppeling maakt u los met 🔗.</p>`, 'Alle ' + pairs.length + ' paren koppelen')) return;
+      for (const [p, n] of pairs) { const g = uid(); p.match = g; n.match = g; }
+      changed(); render(); toast(pairs.length + ' paren gekoppeld.'); return;
+    }
     case 'uncat-more': uncatState.shown += 300; return render();
     case 'uncat-no': uncatState.offer = null; return render();
     case 'uncat-all': { const o = uncatState.offer; if (o) { for (const id of o.ids) { const t = idx().tx.get(id); if (t) assignCategory(t, o.sel); } changed(); toast(o.ids.length + ' transacties op ' + o.label + ' gezet.'); } uncatState.offer = null; return render(); }
