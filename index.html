@@ -232,7 +232,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.10 (oktober 2026)';
+const APP_VERSION = '1.11 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -1821,7 +1821,13 @@ function applyTheme() { const t = DB.settings.theme; if (t === 'light' || t === 
    QIF import (Microsoft Money export)
    =================================================================== */
 let importPlan = null;
-function decodeBytes(buf) { try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { return new TextDecoder('windows-1252').decode(buf); } }
+function decodeBytes(buf) {
+  const b = new Uint8Array(buf);
+  if (b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(buf);
+  if (b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(buf);
+  if (b.length > 3 && b[1] === 0 && b[3] === 0 && b[0] !== 0) return new TextDecoder('utf-16le').decode(buf);
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { return new TextDecoder('windows-1252').decode(buf); }
+}
 
 function parseQIF(text) {
   const lines = text.replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
@@ -1909,7 +1915,16 @@ function splitCatField(v) {
   if (slash >= 0) v = v.slice(0, slash);
   return { cat: v.trim() || null, transfer: null };
 }
-const QIF_TX_TYPES = { 'bank': 'checking', 'cash': 'cash', 'ccard': 'credit', 'oth a': 'asset', 'oth l': 'liability' };
+/* Money starts each account export with a line that "transfers" the opening balance to the account itself: L[Account name] */
+const OB_PAYEE = /opening|balance|beginsaldo|begin saldo|openingssaldo|startsaldo|saldo/i;
+function qifOpeningName(records) {
+  const first = records.slice(0, 3).find(r => /^\[.+\]/.test((r.L || '').trim()) && !r.splits && (!r.P || OB_PAYEE.test(r.P)));
+  return first ? splitCatField(first.L).transfer : null;
+}
+const QIF_SKIP_TYPES = ['cat', 'class', 'memorized', 'invst', 'prices', 'security', 'invitem', 'template'];
+// English QIF type names, plus the Dutch names that the Dutch Microsoft Money writes (Kas, Ov B = overige bezittingen, Ov S = overige schulden)
+const QIF_TX_TYPES = { 'bank': 'checking', 'cash': 'cash', 'ccard': 'credit', 'oth a': 'asset', 'oth l': 'liability',
+  'kas': 'cash', 'contant': 'cash', 'creditcard': 'credit', 'ov b': 'asset', 'ov s': 'liability', 'ov. b': 'asset', 'ov. s': 'liability', 'bezit': 'asset', 'schuld': 'liability' };
 function qifAcctType(t) { return QIF_TX_TYPES[String(t || '').toLowerCase()] || 'checking'; }
 
 async function readQifFiles(files) {
@@ -1924,7 +1939,7 @@ async function readQifFiles(files) {
       const tl = s.type.toLowerCase();
       if (tl === 'cat') { for (const r of s.records) if (r.N) cats.push({ name: r.N, kind: ('I' in r) ? 'income' : 'expense' }); continue; }
       if (tl === 'invst') { invst += s.records.length; continue; }
-      if (!(tl in QIF_TX_TYPES)) { other += s.records.length; continue; }
+      if (!(tl in QIF_TX_TYPES) && (QIF_SKIP_TYPES.includes(tl) || !s.records.some(r => r.D && (r.T || r.U)))) { other += s.records.length; continue; }
       const key = s.account && s.account.name ? s.account.name.toLowerCase() : '__unnamed';
       if (!groups.has(key)) groups.set(key, { qifName: s.account && s.account.name || null, qifType: s.type, records: [] });
       groups.get(key).records.push(...s.records);
@@ -1936,12 +1951,12 @@ async function readQifFiles(files) {
     const base = file.name.replace(/\.qif$/i, '');
     const accounts = Array.from(groups.values()).map(g => {
       // Money's export starts with an "Opening Balance" line that names the account itself: L[Account name]
-      let guess = g.qifName;
-      if (!guess) { const ob = g.records.find(r => /opening balance|beginsaldo|openingssaldo/i.test(r.P || '') && /^\[.+\]/.test(r.L || '')); if (ob) guess = splitCatField(ob.L).transfer; }
+      const obName = qifOpeningName(g.records);
+      const guess = g.qifName || obName;
       const name = guess || base;
       const existing = DB.accounts.find(a => a.name.toLowerCase() === name.toLowerCase());
       const ds = g.records.map(r => r.D).filter(Boolean);
-      return { qifName: name, type: qifAcctType(g.qifType), records: g.records, target: existing ? existing.id : 'new', newName: name, firstDate: ds[0], lastDate: ds[ds.length - 1] };
+      return { qifName: name, obName, fromFile: !guess, type: qifAcctType(g.qifType), records: g.records, target: existing ? existing.id : 'new', newName: name, firstDate: ds[0], lastDate: ds[ds.length - 1] };
     });
     plan.files.push({ name: file.name, accounts, cats, invst, other, dateOrder: detected || (localeDecimal() === ',' ? 'DMY' : 'MDY'), detectedOrder: detected, comma: detectDecimalComma(amounts), sample: dates[0] || '' });
   }
@@ -1966,6 +1981,7 @@ function runImport(plan) {
     }
     g._id = id;
     nameMap.set(String(g.qifName).toLowerCase(), id);
+    if (g.obName) nameMap.set(g.obName.toLowerCase(), id);
     nameMap.set(accName(id).toLowerCase(), id);
   }
   _idx = null;
@@ -1999,7 +2015,7 @@ function runImport(plan) {
         const lf = splitCatField(r.L);
         const hasSplits = r.splits && r.splits.length > 1 || (r.splits && r.splits.length === 1 && r.splits[0].$ != null && parseQifAmount(r.splits[0].$, f.comma) !== amount);
         // opening balance: a transfer to the account itself
-        if (!r.splits && lf.transfer && resolveAcc(lf.transfer) === acctId) {
+        if (!r.splits && lf.transfer && (resolveAcc(lf.transfer) === acctId || (g.obName && lf.transfer.toLowerCase() === g.obName.toLowerCase() && g.records.indexOf(r) < 3))) {
           newTx({ accountId: acctId, date, amount, payee: payee || 'Beginsaldo', memo, num, status: status || 'R', ob: true, ik }); st.tx++; continue;
         }
         if (!hasSplits) {
@@ -2358,6 +2374,21 @@ async function readCsvFiles(files) {
 }
 
 
+function qifPreview(g, f) {
+  const counts = { cat: 0, xfer: 0, none: 0, split: 0 };
+  for (const r of g.records) {
+    const lf = splitCatField(r.L);
+    if (r.splits && r.splits.length > 1) counts.split++; else if (lf.transfer || (r.splits && splitCatField(r.splits[0].S).transfer)) counts.xfer++; else if (lf.cat || (r.splits && splitCatField(r.splits[0].S).cat)) counts.cat++; else counts.none++;
+  }
+  const rows = g.records.slice(0, 6).map(r => {
+    const d = parseQifDate(r.D, f.dateOrder), a = parseQifAmount(r.T != null ? r.T : r.U, f.comma);
+    const lf = splitCatField(r.L), sp = r.splits && r.splits.length > 1;
+    const what = sp ? `Gesplitst (${r.splits.length})` : lf.transfer ? '↔ ' + esc(lf.transfer) : lf.cat ? esc(lf.cat) : r.splits ? esc(r.splits[0].S || '') : '<span class="muted">—</span>';
+    return `<tr><td>${d ? fmtDate(d) : '<span class="neg">' + esc(r.D || '?') + '</span>'}</td><td>${esc(r.P || '')}</td><td class="num">${a != null ? moneyHTML(a) : '<span class="neg">?</span>'}</td><td>${what}</td></tr>`;
+  }).join('');
+  return `<details style="margin:6px 0 10px"><summary>Voorbeeld: ${counts.cat.toLocaleString('nl-NL')} met categorie, ${counts.split.toLocaleString('nl-NL')} gesplitst, ${counts.xfer.toLocaleString('nl-NL')} overboekingen, ${counts.none.toLocaleString('nl-NL')} zonder categorie</summary>
+    <table class="t" style="margin-top:6px"><thead><tr><th>Datum</th><th>Begunstigde</th><th class="num">Bedrag</th><th>Categorie in het bestand</th></tr></thead><tbody>${rows}</tbody></table></details>`;
+}
 function viewImport() {
   const p = importPlan;
   let planHTML = '';
@@ -2368,6 +2399,8 @@ function viewImport() {
       ${f.accounts.length ? '' : '<p class="muted">Geen bank-, contant- of creditcardtransacties gevonden in dit bestand.</p>'}
       ${f.accounts.map((g, gi) => `<div style="border-top:1px solid var(--line);padding:12px 0">
         <div style="margin-bottom:8px"><b>${esc(g.qifName)}</b> <span class="muted">· ${g.records.length.toLocaleString('nl-NL')} transacties${g.firstDate ? ` · ${esc(g.firstDate)} … ${esc(g.lastDate)}` : ''}</span></div>
+        ${g.fromFile ? `<p class="hint" style="color:var(--warn-ink)">De naam van deze rekening stond niet in het bestand en is overgenomen van de bestandsnaam. Geef de rekening hieronder dezelfde naam als in Money, anders komen overboekingen vanuit andere rekeningen in een aparte rekening terecht.</p>` : ''}
+        ${qifPreview(g, f)}
         <div class="grid2">
           <label style="margin:0">Importeren in<select data-imp="${fi}:${gi}:target">
             <option value="new" ${g.target === 'new' ? 'selected' : ''}>Een nieuwe rekening met de naam…</option>
