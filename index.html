@@ -232,7 +232,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.11 (oktober 2026)';
+const APP_VERSION = '1.12 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -1958,7 +1958,7 @@ async function readQifFiles(files) {
       const ds = g.records.map(r => r.D).filter(Boolean);
       return { qifName: name, obName, fromFile: !guess, type: qifAcctType(g.qifType), records: g.records, target: existing ? existing.id : 'new', newName: name, firstDate: ds[0], lastDate: ds[ds.length - 1] };
     });
-    plan.files.push({ name: file.name, accounts, cats, invst, other, dateOrder: detected || (localeDecimal() === ',' ? 'DMY' : 'MDY'), detectedOrder: detected, comma: detectDecimalComma(amounts), sample: dates[0] || '' });
+    plan.files.push({ name: file.name, accounts, cats, invst, other, dateOrder: detected || (localeDecimal() === ',' ? 'DMY' : 'MDY'), detectedOrder: detected, comma: detectDecimalComma(amounts), sample: dates[0] || '', sampleAmt: amounts.find(a => /\d[.,]\d{3}[.,]\d{2}$/.test(a)) || amounts.find(a => /[.,]\d{2}$/.test(a)) || amounts[0] || '' });
   }
   return plan;
 }
@@ -2415,7 +2415,8 @@ function viewImport() {
           <option value="MDY" ${f.dateOrder === 'MDY' ? 'selected' : ''}>maand/dag/jaar (Amerikaans)</option>
           <option value="YMD" ${f.dateOrder === 'YMD' ? 'selected' : ''}>jaar-maand-dag</option></select>
           <span class="hint">${f.detectedOrder ? 'Automatisch herkend. ' : 'Niet met zekerheid herkend — controleer dit. '}De eerste datum “${esc(f.sample)}” wordt <b>${ex ? esc(fmtDate(ex)) : 'ongeldig'}</b>.</span></label>
-        <label style="margin:0">Bedragen gebruiken<select data-imp="${fi}:-:comma"><option value="1" ${f.comma ? 'selected' : ''}>een decimale komma (12,50)</option><option value="0" ${!f.comma ? 'selected' : ''}>een decimale punt (12.50)</option></select></label>
+        <label style="margin:0">Bedragen staan in dit bestand met<select data-imp="${fi}:-:comma"><option value="1" ${f.comma ? 'selected' : ''}>een decimale komma (1.234,50)</option><option value="0" ${!f.comma ? 'selected' : ''}>een decimale punt (1,234.50), zoals Money ze vaak schrijft</option></select>
+          <span class="hint">Dit gaat alleen over het bestand; Kasboek toont bedragen altijd als ${esc(money(123450))}. ${f.sampleAmt ? `Bedrag “${esc(f.sampleAmt)}” in het bestand wordt <b>${esc(money(parseQifAmount(f.sampleAmt, f.comma)))}</b>.` : ''}</span></label>
       </div>
       ${f.invst ? `<p class="hint">Dit bestand bevat ${f.invst} beleggingstransacties; Kasboek ondersteunt geen beleggingen, dus die worden overgeslagen.</p>` : ''}
       ${f.cats.length ? `<p class="hint">Bevat ${f.cats.length} categoriedefinities.</p>` : ''}
