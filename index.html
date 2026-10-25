@@ -250,7 +250,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.15 (oktober 2026)';
+const APP_VERSION = '1.16 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -980,13 +980,13 @@ function viewHome() {
   const flows = categoryFlows(from, to, 'all');
   const { income, expense } = sumByKind(flows);
   const spend = spendingRows(flows, null).slice(0, 6);
-  let accHTML = '';
+  let accHTML = '', zeroHidden = 0;
   for (const [label, types] of ACCOUNT_GROUPS) {
     const accs = DB.accounts.filter(a => types.includes(a.type) && !a.closed).sort((a, b) => a.name.localeCompare(b.name));
     if (!accs.length) continue;
     const tot = accs.reduce((s, a) => s + (I.bal.get(a.id) || 0), 0);
     accHTML += `<tr><td colspan="2" style="padding-top:14px" class="muted"><b>${label}</b></td></tr>`;
-    for (const a of accs) accHTML += `<tr class="click" data-acc="${a.id}"><td>${esc(a.name)}</td><td class="num">${moneyHTML(I.bal.get(a.id) || 0)}</td></tr>`;
+    for (const a of accs) { if (sideHideZero && !(I.bal.get(a.id) || 0)) { zeroHidden++; continue; } accHTML += `<tr class="click" data-acc="${a.id}"><td>${esc(a.name)}</td><td class="num">${moneyHTML(I.bal.get(a.id) || 0)}</td></tr>`; }
     if (accs.length > 1) accHTML += `<tr><td class="muted">Totaal ${label.toLowerCase()}</td><td class="num muted">${esc(money(tot))}</td></tr>`;
   }
   const recent = DB.transactions.filter(t => !t.linkId).sort(cmpTx).slice(-8).reverse();
@@ -996,7 +996,7 @@ function viewHome() {
     <div class="head"><div class="grow"><div class="sub">Vermogen</div><div class="hero ${net < 0 ? 'neg' : ''}">${esc(money(net))}</div></div>
       <button class="btn primary" data-act="new-tx-any">+ Nieuwe transactie</button></div>
     <div class="cols2">
-      <div class="card"><h2>Rekeningen</h2><table class="t">${accHTML}</table></div>
+      <div class="card"><div class="row" style="align-items:baseline;flex-wrap:wrap"><h2 style="flex:1">Rekeningen</h2><label class="zerotoggle" style="padding:0"><input type="checkbox" data-hidezero-home ${sideHideZero ? 'checked' : ''}> Saldo ${esc(money(0))} verbergen</label></div><table class="t">${accHTML}</table>${zeroHidden ? `<p class="hint" style="margin-top:8px">${zeroHidden} ${zeroHidden === 1 ? 'rekening' : 'rekeningen'} met saldo ${esc(money(0))} verborgen.</p>` : ''}</div>
       <div class="card"><h2>Deze maand</h2>
         <div class="tiles">
           <div class="tile"><div class="k">Inkomsten</div><div class="v">${esc(money(income))}</div></div>
@@ -2612,6 +2612,7 @@ function makeSample() {
 
 /* ---------- events ---------- */
 function afterRender() {
+  const hzh = $('[data-hidezero-home]'); if (hzh) hzh.onchange = () => { sideHideZero = hzh.checked; saveSidePrefs(); render(); };
   $$('[data-ucat]').forEach(sel => sel.onchange = async () => {
     if (sel.value === '__new') {
       const t = idx().tx.get(sel.dataset.ucat);
