@@ -232,7 +232,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.9 (oktober 2026)';
+const APP_VERSION = '1.10 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -2093,6 +2093,10 @@ function parseBankAmount(s, comma) {
   const v = Math.round(parseFloat(s) * 100);
   return isFinite(v) ? (neg ? -v : v) : null;
 }
+/* words banks use for money out / in: af, debet, D, afschrijving(en), uitgaand … / bij, credit, C, bijschrijving(en), inkomend … */
+const SIGN_OUT = /^(af|afschrijving(en)?|afgeschreven|debet|debit|d|dr|uitgaand|uitgave(n)?|betaling|out|-)$/;
+const SIGN_IN = /^(bij|bijschrijving(en)?|bijgeschreven|credit|c|cr|inkomend|ontvangst(en)?|storting|in|\+)$/;
+const signWord = s => String(s || '').trim().toLowerCase().replace(/[.:]$/, '');
 const isDateLike = s => /^\d{8}$/.test(s) || /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test(s);
 const isAmountLike = s => /^[+\-−]?\s*(€\s*)?\d{1,3}([.,]?\d{3})*([.,]\d{1,2})?$/.test(String(s).trim()) && /\d/.test(s);
 function guessRoles(headers, rows) {
@@ -2121,7 +2125,7 @@ function guessRoles(headers, rows) {
   const ibanCols = [];
   for (let i = 0; i < n; i++) { const c = col(i); if (c.length && c.filter(looksIban).length >= c.length * 0.6) ibanCols.push(i); }
   for (const i of ibanCols) { if (roles[i]) continue; const c = col(i).map(normIban); const constant = c.every(x => x === c[0]); set(i, constant && !roles.includes('own') ? 'own' : 'cp'); }
-  if (!roles.includes('sign')) { for (let i = 0; i < n; i++) { if (roles[i]) continue; const c = col(i).map(s => s.toLowerCase()); if (c.length && c.every(s => /^(af|bij|d|c|debet|credit|debit)$/.test(s))) { set(i, 'sign'); break; } } }
+  if (!roles.includes('sign')) { for (let i = 0; i < n; i++) { if (roles[i]) continue; const c = col(i); if (c.length && c.every(s => SIGN_OUT.test(signWord(s)) || SIGN_IN.test(signWord(s))) && c.some(s => /[a-z]/i.test(s))) { set(i, 'sign'); break; } } }
   if (!roles.includes('amount') && !roles.includes('debit')) {
     const cands = [];
     for (let i = 0; i < n; i++) { if (roles[i]) continue; const c = col(i); if (c.length && c.every(isAmountLike) && c.some(s => /[.,]\d{2}$/.test(s))) cands.push(i); }
@@ -2201,7 +2205,7 @@ function csvRecords(f) {
       const d = ix('debit') >= 0 ? parseBankAmount(r[ix('debit')], f.comma) : null, c = ix('credit') >= 0 ? parseBankAmount(r[ix('credit')], f.comma) : null;
       if (d) amount = -Math.abs(d); else if (c) amount = Math.abs(c); else if (d === 0 || c === 0) amount = 0;
     }
-    if (ix('sign') >= 0 && amount != null) { const sg = String(r[ix('sign')] || '').trim().toLowerCase(); if (/^(af|d|debet|debit)$/.test(sg)) amount = -Math.abs(amount); else if (/^(bij|c|credit)$/.test(sg)) amount = Math.abs(amount); }
+    if (ix('sign') >= 0 && amount != null) { const sg = signWord(r[ix('sign')]); if (SIGN_OUT.test(sg)) amount = -Math.abs(amount); else if (SIGN_IN.test(sg)) amount = Math.abs(amount); }
     if (!date || amount == null) { bad.push(n + 1); return; }
     let payee = ix('payee') >= 0 ? (r[ix('payee')] || '').replace(/\s+/g, ' ').trim() : '';
     let memo = descIx.map(i => r[i] || '').filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
