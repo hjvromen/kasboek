@@ -232,7 +232,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.8 (oktober 2026)';
+const APP_VERSION = '1.9 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -721,6 +721,13 @@ function sortedTopCats(kind) { return DB.categories.filter(c => !c.parentId && (
 function catOptions(selected, excludeAccountId, opts = {}) {
   const I = idx();
   let h = `<option value="">${opts.noneLabel || '— Geen categorie —'}</option>`;
+  const xfer = () => {
+    if (opts.noTransfers) return '';
+    const accs = DB.accounts.filter(a => a.id !== excludeAccountId && (!a.closed || selected === 't:' + a.id)).sort((a, b) => a.name.localeCompare(b.name));
+    return `<optgroup label="Overboeken naar / van rekening">` + (accs.length ? accs.map(a => `<option value="t:${a.id}" ${selected === 't:' + a.id ? 'selected' : ''}>↔ Overboeken: ${esc(a.name)}</option>`).join('')
+      : `<option disabled>(Voeg eerst een tweede rekening toe)</option>`) + `</optgroup>`;
+  };
+  if (opts.transfersFirst) h += xfer();
   for (const [kind, label] of [['expense', 'Uitgaven'], ['income', 'Inkomsten']]) {
     const tops = sortedTopCats(kind);
     if (!tops.length) continue;
@@ -731,14 +738,7 @@ function catOptions(selected, excludeAccountId, opts = {}) {
     }
     h += `</optgroup>`;
   }
-  if (!opts.noTransfers) {
-    const accs = DB.accounts.filter(a => a.id !== excludeAccountId && (!a.closed || selected === 't:' + a.id));
-    if (accs.length) {
-      h += `<optgroup label="Overboeken naar / van rekening">`;
-      for (const a of accs) h += `<option value="t:${a.id}" ${selected === 't:' + a.id ? 'selected' : ''}>↔ ${esc(a.name)}</option>`;
-      h += `</optgroup>`;
-    }
-  }
+  if (!opts.transfersFirst) h += xfer();
   if (!opts.noNew) h += `<option value="__new">+ Nieuwe categorie…</option>`;
   return h;
 }
@@ -1176,9 +1176,9 @@ function openTxEditor(tx, accountId, startType) {
         renderCatArea();
       };
     } else {
-      el.innerHTML = `<div style="font-size:14px;font-weight:550;margin-bottom:4px">Verdelen over categorieën</div>
+      el.innerHTML = `<div style="font-size:14px;font-weight:550;margin-bottom:4px">Verdelen over categorieën <span class="hint" style="font-weight:400">— een regel kan ook een overboeking naar een andere rekening zijn (bovenaan in de lijst)</span></div>
         <table class="splits"><tbody>${splits.map((s, i) => `<tr>
-          <td style="width:45%"><select data-si="${i}" data-f="sel">${catOptions(s.sel, acctId)}</select></td>
+          <td style="width:45%"><select data-si="${i}" data-f="sel">${catOptions(s.sel, acctId, { transfersFirst: true })}</select></td>
           <td><input data-si="${i}" data-f="memo" value="${esc(s.memo)}" placeholder="Notitie"></td>
           <td class="amt"><input data-si="${i}" data-f="amt" value="${esc(s.amt)}" inputmode="decimal" placeholder="0${localeDecimal()}00"></td>
           <td><button type="button" class="icon-btn" data-rm="${i}" aria-label="Regel verwijderen">×</button></td></tr>`).join('')}</tbody></table>
