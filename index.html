@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.20 (oktober 2026)';
+const APP_VERSION = '1.21 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -610,7 +610,7 @@ function repairLinks() {
     if (t.splits) for (const s of t.splits) if (s.transferAccountId && !accIds.has(s.transferAccountId)) s.transferAccountId = null;
     const want = [];
     if (t.splits && t.splits.length) t.splits.forEach((s, i) => { if (s.transferAccountId && s.transferAccountId !== t.accountId) want.push(i + ':' + s.transferAccountId + ':' + (-s.amount)); });
-    else if (t.transferAccountId && t.transferAccountId !== t.accountId) want.push('-1:' + t.transferAccountId + ':' + (-t.amount));
+    else if (t.transferAccountId && t.transferAccountId !== t.accountId) want.push('-1:' + t.transferAccountId + ':' + (t.otherAmount != null ? t.otherAmount : -t.amount));
     const have = (legs.get(t.id) || []).map(l => (l.linkKey == null ? -1 : l.linkKey) + ':' + l.accountId + ':' + l.amount + (l.date === t.date ? '' : '!'));
     if (want.sort().join('|') !== have.sort().join('|')) syncLegs(t);
   }
@@ -827,7 +827,7 @@ function syncLegs(src) {
   if (src.splits && src.splits.length) {
     src.splits.forEach((s, i) => { if (s.transferAccountId && s.transferAccountId !== src.accountId) want.push({ k: i, acc: s.transferAccountId, amt: -s.amount, memo: s.memo || src.memo }); });
   } else if (src.transferAccountId && src.transferAccountId !== src.accountId) {
-    want.push({ k: -1, acc: src.transferAccountId, amt: -src.amount, memo: src.memo });
+    want.push({ k: -1, acc: src.transferAccountId, amt: src.otherAmount != null ? src.otherAmount : -src.amount, memo: src.memo });
   }
   const existing = DB.transactions.filter(t => t.linkId === src.id);
   const keep = new Set();
@@ -1469,7 +1469,7 @@ function openTxEditor(tx, accountId, startType) {
       splits: outSplits, categoryId: !outSplits && curSel.startsWith('c:') ? curSel.slice(2) : null, transferAccountId: !outSplits && curSel.startsWith('t:') ? curSel.slice(2) : null,
     };
     let t;
-    if (isNew) t = newTx(fields); else { t = DB.transactions.find(x => x.id === src.id); Object.assign(t, fields); }
+    if (isNew) t = newTx(fields); else { t = DB.transactions.find(x => x.id === src.id); if (t.otherAmount != null && (fields.amount !== src.amount || fields.accountId !== src.accountId || fields.transferAccountId !== src.transferAccountId)) delete t.otherAmount; Object.assign(t, fields); }
     syncLegs(t);
     lastEnteredDate = date;
     changed();
@@ -2250,6 +2250,10 @@ function runImport(plan) {
               // the other side may already be here from an earlier file → match instead of duplicating
               const leg = DB.transactions.find(t => t.linkId && !t.ik && t.accountId === acctId && t.date === date && t.amount === amount && (idxTx(t.linkId) || {}).accountId === other);
               if (leg) { leg.ik = ik; if (status) leg.status = status; if (num) leg.num = num; if (memo && !leg.memo) leg.memo = memo; st.matched++; continue; }
+              // same transfer, but booked in another currency on the other side (e.g. a dollar account):
+              // same date, same two accounts, same direction, only the amount differs
+              const fx = amount && DB.transactions.find(t => t.linkId && !t.ik && t.linkKey === -1 && t.accountId === acctId && t.date === date && Math.sign(t.amount) === Math.sign(amount) && (idxTx(t.linkId) || {}).accountId === other);
+              if (fx) { const src = idxTx(fx.linkId); src.otherAmount = amount; fx.amount = amount; fx.ik = ik; if (status) fx.status = status; if (memo && !fx.memo) fx.memo = memo; st.matched++; st.fx = (st.fx || 0) + 1; continue; }
               const t = newTx({ accountId: acctId, date, amount, payee, memo, num, status, transferAccountId: other, ik });
               syncLegs(t); st.tx++; continue;
             }
@@ -3045,6 +3049,7 @@ document.addEventListener('click', async e => {
         ${st.autoAccounts.length ? `<p>Deze rekeningen kwamen alleen voor in overboekingen en zijn daarom aangemaakt met alleen die overboekingen: <b>${st.autoAccounts.map(esc).join(', ')}</b>. Importeer ook hun eigen QIF-bestanden om ze compleet te maken.</p>` : ''}
         ${st.cashBooked ? `<p>${st.cashBooked.toLocaleString('nl-NL')} geldbedragen van beleggingen (koop, verkoop, dividend, rente) zijn op de bijbehorende kasrekening geboekt.</p>` : ''}
         ${st.cats ? `<p>${st.cats} categorieën aangemaakt.</p>` : ''}
+        ${st.fx ? `<p>${st.fx} overboekingen hebben aan beide kanten een ander bedrag (andere valuta, zoals een dollarrekening); die zijn ook gekoppeld.</p>` : ''}
         ${st.dupes ? `<p>${st.dupes.toLocaleString('nl-NL')} transacties stonden al in Kasboek en zijn overgeslagen.</p>` : ''}
         ${st.badDates ? `<p class="neg">${st.badDates} transacties hadden een onleesbare datum en zijn overgeslagen.</p>` : ''}
         ${st.invst ? `<p class="muted">${st.invst} beleggingstransacties zijn overgeslagen.</p>` : ''}
