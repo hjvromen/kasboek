@@ -171,6 +171,11 @@ summary{cursor:pointer}
 tr.matched td{color:var(--muted)}
 tr.kpsel td{background:var(--accent-soft)}
 .btn:disabled{opacity:.45;cursor:default}
+.bookbtn{display:flex;align-items:center;gap:6px;width:100%;border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:6px 10px;margin:0 0 10px;cursor:pointer;font-weight:600;font-size:14px;text-align:left}
+.bookbtn:hover{border-color:var(--accent)}
+.bookbtn .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bookrow{border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.bookrow.on{border-color:var(--accent);background:var(--accent-soft)}
 .splitsum{font-size:14px;color:var(--ink-2);display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 .hbars{display:flex;flex-direction:column;gap:2px}
 .hbar{display:grid;grid-template-columns:minmax(90px,200px) minmax(40px,1fr) auto 40px;gap:12px;align-items:center;border:0;background:none;padding:6px 6px;border-radius:7px;text-align:left;cursor:default;width:100%}
@@ -254,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.18 (oktober 2026)';
+const APP_VERSION = '1.19 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -450,6 +455,51 @@ function dataDateRange() {
 
 /* ---------- storage: browser database + backup files ---------- */
 let storageMode = 'none', idbHandle = null, saveTimer = null, saveState = 'saved';
+/* ---------- administraties (separate books, like separate Money files) ---------- */
+let BOOK = (() => { try { return localStorage.getItem('kasboek-book') || 'main'; } catch (e) { return 'main'; } })();
+let BOOKS = [{ id: 'main', name: 'Huishouden' }];
+const K = name => BOOK === 'main' ? name : name + ':' + BOOK;
+const bookName = () => (BOOKS.find(b => b.id === BOOK) || BOOKS[0]).name;
+async function loadBooks() {
+  try { const b = idbHandle && await idbGet('books'); if (Array.isArray(b) && b.length) BOOKS = b; } catch (e) {}
+  if (!BOOKS.some(b => b.id === BOOK)) BOOK = 'main';
+}
+async function saveBooks() { if (idbHandle) await idbPut('books', BOOKS); }
+async function switchBook(id) {
+  clearTimeout(saveTimer); await saveNow();
+  try { localStorage.setItem('kasboek-book', id); } catch (e) {}
+  location.reload();
+}
+function openBooks() {
+  const w = openModal({ title: 'Administraties', body: `
+    <p class="sub" style="margin-top:0">Elke administratie heeft eigen rekeningen, categorieën en rapporten, net als aparte bestanden in Money. Een administratie die u niet als gedeeld bestand opslaat, staat alleen op deze computer.</p>
+    <div class="cards" style="gap:6px;margin:12px 0">${BOOKS.map(b => `<div class="row bookrow ${b.id === BOOK ? 'on' : ''}"><b style="flex:1">${esc(b.name)}</b>${b.id === BOOK ? '<span class="pill">geopend</span>' : `<button class="btn small primary" data-book-open="${b.id}">Openen</button>`}<button class="btn small" data-book-ren="${b.id}">Naam wijzigen</button>${b.id !== 'main' && b.id !== BOOK ? `<button class="btn small danger" data-book-del="${b.id}">Verwijderen</button>` : ''}</div>`).join('')}</div>
+    <form id="newbook" class="row" style="flex-wrap:wrap;align-items:flex-end">
+      <label style="flex:1;margin:0;min-width:200px">Nieuwe administratie<input name="name" placeholder="bijv. Persoonlijk"></label>
+      <label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" name="cats" checked style="width:auto;min-height:0"> Categorieën van “${esc(bookName())}” overnemen</label>
+      <button class="btn primary">Aanmaken en openen</button>
+    </form>` });
+  $$('[data-book-open]', w).forEach(b => b.onclick = () => switchBook(b.dataset.bookOpen));
+  $$('[data-book-ren]', w).forEach(b => b.onclick = async () => {
+    const bk = BOOKS.find(x => x.id === b.dataset.bookRen); const n = await promptBox('Naam wijzigen', 'Naam van de administratie', bk.name);
+    if (n) { bk.name = n; await saveBooks(); closeModal(w); renderSide(); updateSaveStatus(); document.title = 'Kasboek – ' + bookName(); openBooks(); }
+  });
+  $$('[data-book-del]', w).forEach(b => b.onclick = async () => {
+    const bk = BOOKS.find(x => x.id === b.dataset.bookDel);
+    if (!await confirmBox('“' + bk.name + '” verwijderen?', '<p>Alle rekeningen en transacties van deze administratie worden van deze computer verwijderd. Reservekopieën en een eventueel gedeeld bestand blijven bestaan.</p>', 'Verwijderen', true)) return;
+    const KB = n => n + ':' + bk.id; for (const k of ['data', 'fh', 'base']) await idbDel(KB(k));
+    try { localStorage.removeItem(KB('kasboek-data')); } catch (e) {}
+    BOOKS = BOOKS.filter(x => x !== bk); await saveBooks(); closeModal(w); openBooks();
+  });
+  $('#newbook', w).onsubmit = async e => {
+    e.preventDefault(); const name = e.target.name.value.trim(); if (!name) return e.target.name.focus();
+    const id = uid(); const nd = emptyDB(); nd.settings = Object.assign({}, DB.settings, { csvMaps: {} }); delete nd.settings.mt;
+    if (e.target.cats.checked) nd.categories = DB.categories.map(c => { const o = Object.assign({}, c); delete o.mt; return o; });
+    BOOKS.push({ id, name }); await saveBooks();
+    if (idbHandle) await idbPut('data:' + id, JSON.stringify(nd));
+    switchBook(id);
+  };
+}
 function idbOpen() {
   return new Promise((res, rej) => {
     if (!window.indexedDB) return rej(new Error('no indexedDB'));
@@ -465,11 +515,11 @@ function idbDel(key) { return new Promise(res => { try { const tx = idbHandle.tr
 async function loadData() {
   let raw = null;
   try {
-    idbHandle = await idbOpen(); storageMode = 'idb'; raw = await idbGet('data');
-    fileHandle = (await idbGet('fh')) || null;
-    baseStr = (await idbGet('base')) || null;
+    idbHandle = await idbOpen(); storageMode = 'idb'; await loadBooks(); raw = await idbGet(K('data'));
+    fileHandle = (await idbGet(K('fh'))) || null;
+    baseStr = (await idbGet(K('base'))) || null;
   } catch (e) { idbHandle = null; }
-  if (!raw) { try { raw = localStorage.getItem('kasboek-data'); if (storageMode === 'none' && localStorage) storageMode = 'ls'; } catch (e) {} }
+  if (!raw) { try { raw = localStorage.getItem(K('kasboek-data')); if (storageMode === 'none' && localStorage) storageMode = 'ls'; } catch (e) {} }
   if (raw) { try { const d = JSON.parse(raw); if (d && d.app === 'kasboek') return d; } catch (e) {} }
   return null;
 }
@@ -477,11 +527,11 @@ function scheduleSave() { saveState = 'saving'; updateSaveStatus(); clearTimeout
 async function saveNow() {
   const json = JSON.stringify(DB);
   try {
-    if (storageMode === 'idb') await idbPut('data', json);
-    else { localStorage.setItem('kasboek-data', json); storageMode = 'ls'; }
+    if (storageMode === 'idb') await idbPut(K('data'), json);
+    else { localStorage.setItem(K('kasboek-data'), json); storageMode = 'ls'; }
     saveState = 'saved';
   } catch (e) {
-    try { localStorage.setItem('kasboek-data', json); storageMode = 'ls'; saveState = 'saved'; }
+    try { localStorage.setItem(K('kasboek-data'), json); storageMode = 'ls'; saveState = 'saved'; }
     catch (e2) { saveState = 'failed'; }
   }
   updateSaveStatus();
@@ -585,7 +635,7 @@ async function syncFile() {
     baseStr = out; baseMaps = null;
     lastMod = (await fileHandle.getFile()).lastModified;
     lastSync = Date.now(); fileStatus = 'ok'; fileError = '';
-    if (idbHandle) { await idbPut('base', out); await idbPut('data', out); }
+    if (idbHandle) { await idbPut(K('base'), out); await idbPut(K('data'), out); }
     if (external) {
       _idx = null; resetFormats(); applyTheme();
       if (JSON.stringify([DB.accounts, DB.categories, DB.transactions, DB.settings]) !== beforeJSON) {
@@ -610,7 +660,7 @@ async function checkForOtherComputer() {
 }
 async function useFileHandle(h) {
   fileHandle = h;
-  if (idbHandle) await idbPut('fh', h);
+  if (idbHandle) await idbPut(K('fh'), h);
   fileStatus = 'ok';
   await syncFile();
   render();
@@ -644,7 +694,7 @@ async function reconnectFile() {
 async function stopSharedFile() {
   if (!await confirmBox('Stoppen met het gedeelde bestand?', '<p>Kasboek houdt een kopie van alle gegevens op deze computer, maar wijzigingen worden niet meer gedeeld met de andere computer. Het gedeelde bestand zelf wordt niet verwijderd.</p>', 'Stoppen met delen')) return;
   fileHandle = null; fileStatus = 'none'; baseStr = null; baseMaps = null;
-  if (idbHandle) { await idbDel('fh'); await idbDel('base'); }
+  if (idbHandle) { await idbDel(K('fh')); await idbDel(K('base')); }
   render();
 }
 async function mergeOtherFile() {
@@ -690,7 +740,7 @@ function download(name, text, mime) {
 }
 function saveBackup() {
   DB.lastBackup = new Date().toISOString();
-  download('Kasboek reservekopie ' + todayISO() + '.json', JSON.stringify(DB, null, 1), 'application/json');
+  download('Kasboek reservekopie ' + (BOOKS.length > 1 || BOOK !== 'main' ? bookName() + ' ' : '') + todayISO() + '.json', JSON.stringify(DB, null, 1), 'application/json');
   changed(); render();
   toast('Reservekopie opgeslagen in uw map Downloads.');
 }
@@ -849,6 +899,7 @@ function renderSide() {
   const chev = open => `<svg class="chev ${open ? 'open' : ''}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
   const accBtn = (a, muted) => { const b = I.bal.get(a.id) || 0; return `<button class="nav${on('account', a.id)}" data-acc="${a.id}">${ICONS.acct}<span class="nm ${muted ? 'muted' : ''}">${esc(a.name)}</span>${muted ? '' : `<span class="amt ${b < 0 ? 'neg' : ''}">${esc(money(b))}</span>`}</button>`; };
   let h = `<div class="brand"><svg width="26" height="26" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M9 21V11M9 16l7-5M9 16l7 5M19 21h5M19 16h5M19 11h5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><span class="t">Kasboek</span></div>
+  <button class="bookbtn" data-act="books" title="Andere administratie openen of een nieuwe maken"><span class="nm">${esc(bookName())}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5 5 5-5"/></svg></button>
   <div class="mainnav">
   <button class="nav${on('home')}" data-go="home">${ICONS.home}<span class="nm">Overzicht</span></button>
   <button class="nav${on('reports')}" data-go="reports">${ICONS.reports}<span class="nm">Rapporten</span></button>
@@ -2780,6 +2831,7 @@ document.addEventListener('click', async e => {
   if (d.catKind) { const c = idx().cat.get(d.catKind); c.kind = c.kind === 'expense' ? 'income' : 'expense'; for (const s of (idx().childrenOf.get(c.id) || [])) s.kind = c.kind; changed(); render(); return; }
   if (d.catDel) return deleteCategory(d.catDel);
   switch (d.act) {
+    case 'books': return openBooks();
     case 'kp-link': return kpLink(idx().acc.get(state.accountId));
     case 'kp-clear': kpState.sel = new Set(); return render();
     case 'kp-auto': {
@@ -2888,6 +2940,7 @@ $('#file-qif').addEventListener('change', async e => {
 /* ---------- start ---------- */
 (async function start() {
   const d = await loadData();
+  document.title = BOOKS.length > 1 || BOOK !== 'main' ? 'Kasboek – ' + bookName() : 'Kasboek';
   if (d) { DB = Object.assign(emptyDB(), d); DB.settings = Object.assign(emptyDB().settings, d.settings || {}); }
   applyTheme();
   if (fileHandle) {
