@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.19 (oktober 2026)';
+const APP_VERSION = '1.20 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -323,12 +323,14 @@ const ACCOUNT_TYPES = [
   ['cash', 'Contant geld'],
   ['asset', 'Overige bezitting (huis, auto…)'],
   ['liability', 'Lening / hypotheek / overige schuld'],
+  ['invest', 'Beleggingsrekening (historie)'],
 ];
 const ACCOUNT_GROUPS = [
   ['Bank en contant', ['checking', 'savings', 'cash']],
   ['Creditcards', ['credit']],
   ['Bezittingen', ['asset']],
   ['Leningen en schulden', ['liability']],
+  ['Beleggingen', ['invest']],
 ];
 const isDebtType = t => t === 'credit' || t === 'liability';
 
@@ -844,6 +846,7 @@ function deleteTx(src) {
 function txCategoryLabel(t) {
   const I = idx();
   if (t.ob) return '<span class="muted">Beginsaldo</span>';
+  if (t.inv) return esc(invLabel(t.inv.act) + ' ' + t.inv.sec);
   if (t.linkId) { const s = I.tx.get(t.linkId); const a = s && I.acc.get(s.accountId); return '↔ ' + esc(a ? a.name : 'andere rekening'); }
   if (t.splits && t.splits.length) return `Gesplitst (${t.splits.length} regels)`;
   if (t.transferAccountId) { const a = I.acc.get(t.transferAccountId); return '↔ ' + esc(a ? a.name : 'andere rekening'); }
@@ -964,7 +967,7 @@ function categoryFlows(from, to, accountId) {
   const flows = new Map();
   const add = (k, v) => flows.set(k, (flows.get(k) || 0) + v);
   for (const t of DB.transactions) {
-    if (t.linkId || t.ob || t.date < from || t.date > to) continue;
+    if (t.linkId || t.ob || (t.inv && !t.categoryId) || t.date < from || t.date > to) continue;
     if (accountId && accountId !== 'all' && t.accountId !== accountId) continue;
     if (t.splits && t.splits.length) {
       for (const s of t.splits) { if (s.transferAccountId) continue; add(s.categoryId || (s.amount > 0 ? '_in' : '_out'), s.amount); }
@@ -983,7 +986,7 @@ const uncatState = { account: 'all', search: '', shown: 200, offer: null };
 function uncatList() {
   const out = [];
   for (const t of DB.transactions) {
-    if (t.linkId || t.ob) continue;
+    if (t.linkId || t.ob || (t.inv && !t.categoryId)) continue;
     if (t.splits && t.splits.length) { if (t.splits.some(s => !s.categoryId && !s.transferAccountId)) out.push(t); continue; }
     if (!t.categoryId && !t.transferAccountId) out.push(t);
   }
@@ -1125,6 +1128,7 @@ function viewRegister() {
   const I = idx();
   const a = I.acc.get(state.accountId);
   if (!a) { state = { view: 'home' }; return viewHome(); }
+  if (a.type === 'invest' || (I.byAcc.get(a.id) || []).some(t => t.inv)) return viewInvRegister(a);
   const all = I.byAcc.get(a.id) || [];
   let run = 0; const runBal = new Map();
   for (const t of all) { run += t.amount; runBal.set(t.id, run); }
@@ -1265,6 +1269,7 @@ function toast(msg) {
 /* ---------- Transaction editor ---------- */
 function openTxEditor(tx, accountId, startType) {
   const I = idx();
+  if (tx && tx.inv) return openInvDetails(tx);
   const fromLeg = tx && tx.linkId;
   const src = tx ? (tx.linkId ? I.tx.get(tx.linkId) : tx) : null;
   const isNew = !src;
@@ -1697,7 +1702,7 @@ function gridFlows(accountId, n, colOf) {
   const m = new Map();
   const add = (k, mi, v) => { if (!m.has(k)) m.set(k, new Array(n).fill(0)); m.get(k)[mi] += v; };
   for (const t of DB.transactions) {
-    if (t.linkId || t.ob) continue;
+    if (t.linkId || t.ob || (t.inv && !t.categoryId)) continue;
     if (accountId !== 'all' && t.accountId !== accountId) continue;
     const mi = colOf(t.date);
     if (mi < 0) continue;
@@ -1759,7 +1764,7 @@ function yearSpan() {
 function txForCategories(from, to, accountId, ids) {
   const set = new Set(ids), out = [];
   for (const t of DB.transactions) {
-    if (t.linkId || t.ob || t.date < from || t.date > to) continue;
+    if (t.linkId || t.ob || (t.inv && !t.categoryId) || t.date < from || t.date > to) continue;
     if (accountId !== 'all' && t.accountId !== accountId) continue;
     if (t.splits && t.splits.length) { for (const s of t.splits) if (!s.transferAccountId && set.has(s.categoryId || (s.amount > 0 ? '_in' : '_out'))) out.push({ t, amount: s.amount, memo: s.memo || t.memo }); }
     else if (!t.transferAccountId && set.has(t.categoryId || (t.amount > 0 ? '_in' : '_out'))) out.push({ t, amount: t.amount, memo: t.memo });
@@ -1777,7 +1782,7 @@ function showGridCell(label, ids, from, to, when) {
 function txForCategory(from, to, accountId, catId) {
   const out = [];
   for (const t of DB.transactions) {
-    if (t.linkId || t.ob || t.date < from || t.date > to) continue;
+    if (t.linkId || t.ob || (t.inv && !t.categoryId) || t.date < from || t.date > to) continue;
     if (accountId !== 'all' && t.accountId !== accountId) continue;
     if (t.splits && t.splits.length) { for (const s of t.splits) if ((s.categoryId || (s.transferAccountId ? null : (s.amount > 0 ? '_in' : '_out'))) === catId) out.push({ t, amount: s.amount, memo: s.memo || t.memo }); }
     else if (!t.transferAccountId && (t.categoryId || (t.amount > 0 ? '_in' : '_out')) === catId) out.push({ t, amount: t.amount, memo: t.memo });
@@ -2133,9 +2138,9 @@ function qifOpeningName(records) {
   const first = records.slice(0, 3).find(r => /^\[.+\]/.test((r.L || '').trim()) && !r.splits && (!r.P || OB_PAYEE.test(r.P)));
   return first ? splitCatField(first.L).transfer : null;
 }
-const QIF_SKIP_TYPES = ['cat', 'class', 'memorized', 'invst', 'prices', 'security', 'invitem', 'template'];
+const QIF_SKIP_TYPES = ['cat', 'class', 'memorized', 'prices', 'security', 'invitem', 'template'];
 // English QIF type names, plus the Dutch names that the Dutch Microsoft Money writes (Kas, Ov B = overige bezittingen, Ov S = overige schulden)
-const QIF_TX_TYPES = { 'bank': 'checking', 'cash': 'cash', 'ccard': 'credit', 'oth a': 'asset', 'oth l': 'liability',
+const QIF_TX_TYPES = { 'invst': 'invest', 'beleg': 'invest', 'bank': 'checking', 'cash': 'cash', 'ccard': 'credit', 'oth a': 'asset', 'oth l': 'liability',
   'kas': 'cash', 'contant': 'cash', 'creditcard': 'credit', 'ov b': 'asset', 'ov s': 'liability', 'ov. b': 'asset', 'ov. s': 'liability', 'bezit': 'asset', 'schuld': 'liability' };
 function qifAcctType(t) { return QIF_TX_TYPES[String(t || '').toLowerCase()] || 'checking'; }
 
@@ -2150,7 +2155,6 @@ async function readQifFiles(files) {
     for (const s of sections) {
       const tl = s.type.toLowerCase();
       if (tl === 'cat') { for (const r of s.records) if (r.N) cats.push({ name: r.N, kind: ('I' in r) ? 'income' : 'expense' }); continue; }
-      if (tl === 'invst') { invst += s.records.length; continue; }
       if (!(tl in QIF_TX_TYPES) && (QIF_SKIP_TYPES.includes(tl) || !s.records.some(r => r.D && (r.T || r.U)))) { other += s.records.length; continue; }
       const key = s.account && s.account.name ? s.account.name.toLowerCase() : '__unnamed';
       if (!groups.has(key)) groups.set(key, { qifName: s.account && s.account.name || null, qifType: s.type, records: [] });
@@ -2172,6 +2176,7 @@ async function readQifFiles(files) {
     });
     plan.files.push({ name: file.name, accounts, cats, invst, other, dateOrder: detected || (localeDecimal() === ',' ? 'DMY' : 'MDY'), detectedOrder: detected, comma: detectDecimalComma(amounts), sample: dates[0] || '', sampleAmt: amounts.find(a => /\d[.,]\d{3}[.,]\d{2}$/.test(a)) || amounts.find(a => /[.,]\d{2}$/.test(a)) || amounts[0] || '' });
   }
+  guessCashAccounts(plan);
   return plan;
 }
 
@@ -2197,6 +2202,12 @@ function runImport(plan) {
     nameMap.set(accName(id).toLowerCase(), id);
   }
   _idx = null;
+  for (const f of plan.files) for (const g of f.accounts) {
+    if (g.skip || g.type !== 'invest') continue;
+    if (!g.cash || g.cash === 'none') { g._cashId = null; continue; }
+    if (g.cash.startsWith('plan:')) { const [, fi, gi] = g.cash.split(':'); const pg = plan.files[+fi].accounts[+gi]; g._cashId = pg && !pg.skip ? pg._id : null; }
+    else g._cashId = DB.accounts.some(a => a.id === g.cash) ? g.cash : null;
+  }
   const resolveAcc = name => {
     const k = name.toLowerCase();
     if (nameMap.has(k)) return nameMap.get(k);
@@ -2213,6 +2224,7 @@ function runImport(plan) {
     for (const g of f.accounts) {
       if (g.skip) continue;
       const acctId = g._id;
+      if (g.type === 'invest') { importInvRecords(g, f, acctId, st, existingKeys); continue; }
       const occ = new Map();
       for (const r of g.records) {
         const date = parseQifDate(r.D, f.dateOrder);
@@ -2270,6 +2282,121 @@ function runImport(plan) {
   st.cats = DB.categories.length - before;
   changed();
   return st;
+}
+/* Investment history from Money (!Type:Invst): kept as a record in euros.
+   Amounts are shown but do not change balances, net worth or reports, because the
+   money itself (deposits, withdrawals, dividends) is booked in the cash accounts. */
+const INV_ACTIONS = {
+  buy: 'Koop', sell: 'Verkoop', shrsin: 'Stukken in', shrsout: 'Stukken uit', div: 'Dividend', intinc: 'Rente',
+  reinvdiv: 'Dividend herbelegd', reinvint: 'Rente herbelegd', reinvlg: 'Koerswinst herbelegd', reinvsh: 'Koerswinst herbelegd',
+  cglong: 'Koerswinst', cgshort: 'Koerswinst', cgmid: 'Koerswinst', miscinc: 'Overige opbrengst', miscexp: 'Kosten',
+  rtrncap: 'Kapitaalteruggave', stksplit: 'Splitsing', xin: 'Storting', xout: 'Opname', contrib: 'Storting', withdrwx: 'Opname',
+};
+const invBase = a => String(a || '').toLowerCase().replace(/x$/, '').replace(/^withdrw$/, 'withdrwx');
+const invLabel = a => INV_ACTIONS[invBase(a)] || a || '—';
+const INV_IN = ['buy', 'shrsin', 'reinvdiv', 'reinvint', 'reinvlg', 'reinvsh'], INV_OUT = ['sell', 'shrsout'], INV_INCOME = ['div', 'intinc', 'cglong', 'cgshort', 'cgmid', 'miscinc'];
+/* money effect of an investment record on its cash account */
+function invCashEffect(act, total) {
+  if (act === 'buy') return -total;
+  if (act === 'sell' || act === 'rtrncap' || INV_INCOME.includes(act)) return total;
+  if (act === 'miscexp') return -total;
+  return 0;
+}
+/* Money keeps the money of an investment account on a separate cash account. Find it:
+   the account whose transactions add up to exactly minus the investment cash effects. */
+function guessCashAccounts(plan) {
+  const sums = [];
+  for (const [fi, f] of plan.files.entries()) for (const [gi, g] of f.accounts.entries()) {
+    if (g.type === 'invest') continue;
+    const tot = g.records.reduce((s, r) => s + (parseQifAmount(r.T != null ? r.T : r.U, f.comma) || 0), 0);
+    sums.push({ key: 'plan:' + fi + ':' + gi, tot });
+  }
+  for (const a of DB.accounts) sums.push({ key: a.id, tot: (idx().bal.get(a.id) || 0) });
+  for (const f of plan.files) for (const g of f.accounts) {
+    if (g.type !== 'invest') continue;
+    const eff = g.records.reduce((s, r) => s + invCashEffect(invBase(r.N), Math.abs(parseQifAmount(r.T != null ? r.T : r.U, f.comma) || 0)), 0);
+    const hit = sums.find(x => eff && Math.abs(x.tot + eff) <= 1);
+    g.cash = hit ? hit.key : 'none'; g.cashGuessed = !!hit; g.cashEffect = eff;
+  }
+}
+function importInvRecords(g, f, acctId, st, existingKeys) {
+  const qnum = v => { const x = parseQifAmount(v, f.comma); return x == null ? null : x / 100; };
+  const occ = new Map();
+  for (const r of g.records) {
+    const date = parseQifDate(r.D, f.dateOrder);
+    if (!date) { st.badDates++; continue; }
+    const total = parseQifAmount(r.T != null ? r.T : r.U, f.comma) || 0;
+    const act = invBase(r.N), sec = (r.Y || '').trim();
+    const base = [acctId, date, total, act, sec, r.Q || ''].join('|');
+    const n = (occ.get(base) || 0) + 1; occ.set(base, n);
+    const ik = base + '|' + n;
+    if (existingKeys.has(ik)) { st.dupes++; continue; }
+    existingKeys.add(ik);
+    const inv = { act, sec, qty: r.Q ? qnum(r.Q) : null, price: r.I ? parseFloat(String(r.I).replace(f.comma ? /\./g : /,/g, '').replace(',', '.')) || null : null, comm: r.O ? parseQifAmount(r.O, f.comma) : null, total: Math.abs(total) };
+    newTx({ accountId: acctId, date, amount: 0, payee: sec, memo: (r.M || r.P || '').trim(), status: 'R', inv, ik });
+    st.tx++;
+    const cashId = g._cashId;
+    const eff = invCashEffect(act, Math.abs(total));
+    if (cashId && eff) {
+      const cat = INV_INCOME.includes(act) ? findOrCreateCategory('Inkomsten uit beleggingen:' + (act === 'div' ? 'Dividend' : act === 'intinc' ? 'Rente' : act.startsWith('cg') ? 'Koerswinst' : 'Overig'), 'income').cat.id
+        : act === 'miscexp' ? findOrCreateCategory('Beleggingskosten', 'expense').cat.id : null;
+      const note = [invLabel(act), inv.qty != null ? inv.qty.toLocaleString('nl-NL', { maximumFractionDigits: 4 }) + ' st.' : '', inv.price != null ? 'à ' + inv.price.toLocaleString('nl-NL', { maximumFractionDigits: 4 }) : ''].filter(Boolean).join(' ');
+      newTx({ accountId: cashId, date, amount: eff, payee: sec, memo: note + (r.M ? ' · ' + r.M.trim() : ''), status: 'R', inv: Object.assign({}, inv, { cash: true }), categoryId: cat, ik: ik + '|cash' });
+      st.cashBooked = (st.cashBooked || 0) + 1;
+    }
+  }
+}
+/* summary per security: bought, sold, income, and what is left */
+function invSummary(acctId) {
+  const m = new Map();
+  for (const t of (idx().byAcc.get(acctId) || [])) {
+    if (!t.inv) continue;
+    const { act, sec, qty, total } = t.inv, h = m.get(sec) || { sec, qty: 0, inv: 0, out: 0, inc: 0, first: t.date, last: t.date };
+    if (INV_IN.includes(act)) { h.qty += qty || 0; h.inv += total; }
+    else if (INV_OUT.includes(act)) { h.qty -= qty || 0; h.out += total; }
+    else if (INV_INCOME.includes(act)) h.inc += total;
+    else if (act === 'miscexp') h.inc -= total;
+    h.last = t.date; m.set(sec, h);
+  }
+  return Array.from(m.values()).sort((a, b) => a.sec.localeCompare(b.sec));
+}
+function viewInvRegister(a) {
+  const all = idx().byAcc.get(a.id) || [];
+  const fmtQ = q => q == null ? '' : q.toLocaleString('nl-NL', { maximumFractionDigits: 4 });
+  const fmtP = p => p == null ? '' : p.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  const sum = invSummary(a.id);
+  const tot = sum.reduce((o, h) => ({ inv: o.inv + h.inv, out: o.out + h.out, inc: o.inc + h.inc }), { inv: 0, out: 0, inc: 0 });
+  const q = regState.search.trim().toLowerCase();
+  let rows = all.slice().reverse();
+  if (q) rows = rows.filter(t => (t.payee + ' ' + t.memo + ' ' + (t.inv ? invLabel(t.inv.act) : '')).toLowerCase().includes(q));
+  const pos = new Map(); const posAfter = new Map();
+  for (const t of all) if (t.inv) { const { act, sec, qty } = t.inv; const v = (pos.get(sec) || 0) + (INV_IN.includes(act) ? qty || 0 : INV_OUT.includes(act) ? -(qty || 0) : 0); pos.set(sec, v); posAfter.set(t.id, v); }
+  const shown = rows.slice(0, regState.shown);
+  return `<div class="page">
+    <div class="head"><div class="grow"><h1>${esc(a.name)}${a.closed ? ' <span class="pill">opgeheven</span>' : ''}</h1>
+      <p class="sub">Beleggingshistorie in euro's · ${all.length.toLocaleString('nl-NL')} transacties${all.length ? ` · ${fmtDate(all[0].date)} – ${fmtDate(all[all.length - 1].date)}` : ''}</p></div>
+      <button class="btn" data-act="edit-account">Rekeninggegevens</button></div>
+    <div class="note">Dit is een overzicht van aan- en verkopen, dividend en rente zoals ze in Money stonden, in euro's. Het overzicht zelf telt niet mee in saldi en vermogen; het geld van elke koop, verkoop, dividend- en rentebetaling staat op de kasrekening van de belegging${(() => { const c = DB.transactions.find(t => t.inv && t.inv.cash && (all.some(x => x.date === t.date && x.inv && x.inv.sec === t.inv.sec))); return c ? ' (<b>' + esc(accName(c.accountId)) + '</b>)' : ''; })()}. Dividend en rente tellen daar mee als inkomsten.</div>
+    <div class="card" style="margin-bottom:16px"><h2>Per effect</h2>
+      <div class="ywrap"><table class="t"><thead><tr><th>Effect</th><th class="num">Gekocht / stukken in</th><th class="num">Verkocht / stukken uit</th><th class="num">Dividend en rente</th><th class="num">Resultaat</th><th class="num">Aantal over</th><th>Periode</th></tr></thead><tbody>
+      ${sum.map(h => { const open = Math.abs(h.qty) > 1e-6; return `<tr class="click" data-invsec="${esc(h.sec)}"><td style="min-width:200px">${esc(h.sec)}</td><td class="num">${esc(money(h.inv))}</td><td class="num">${esc(money(h.out))}</td><td class="num">${h.inc ? esc(money(h.inc)) : '<span class="muted">–</span>'}</td><td class="num">${open ? '<span class="muted" title="Positie niet afgesloten">open</span>' : moneyHTML(h.out + h.inc - h.inv)}</td><td class="num">${open ? fmtQ(h.qty) : '<span class="muted">–</span>'}</td><td class="muted" style="white-space:nowrap">${fmtDate(h.first)} – ${fmtDate(h.last)}</td></tr>`; }).join('')}
+      </tbody><tfoot><tr><td>Totaal</td><td class="num">${esc(money(tot.inv))}</td><td class="num">${esc(money(tot.out))}</td><td class="num">${esc(money(tot.inc))}</td><td class="num">${moneyHTML(tot.out + tot.inc - tot.inv)}</td><td></td><td></td></tr></tfoot></table></div>
+      <p class="hint" style="margin-top:8px">Resultaat = verkocht + dividend en rente − gekocht, alleen voor effecten die helemaal verkocht of overgeboekt zijn. Klik op een effect om alleen de transacties daarvan te zien.</p></div>
+    <div class="toolbar"><input type="search" id="reg-search" placeholder="Zoek op effect, actie, notitie…" value="${esc(regState.search)}">${q ? '<button class="btn small" data-act="inv-clear">Alle effecten tonen</button>' : ''}<span class="grow"></span><span class="muted" style="font-size:13px">${rows.length.toLocaleString('nl-NL')} transacties</span></div>
+    <div class="card" style="padding:4px 6px">${rows.length ? `<table class="t"><thead><tr><th>Datum</th><th>Actie</th><th>Effect / notitie</th><th class="num">Aantal</th><th class="num">Koers</th><th class="num">Bedrag</th><th class="num">Positie na</th></tr></thead><tbody>
+      ${shown.map(t => t.inv ? `<tr class="click" data-tx="${t.id}"><td style="white-space:nowrap">${fmtDate(t.date)}</td><td>${esc(invLabel(t.inv.act))}</td><td>${esc(t.inv.sec)}${t.memo ? `<div class="hint">${esc(t.memo)}</div>` : ''}</td><td class="num">${fmtQ(t.inv.qty)}</td><td class="num">${fmtP(t.inv.price)}</td><td class="num">${t.inv.total ? `<span class="${INV_OUT.includes(t.inv.act) || INV_INCOME.includes(t.inv.act) ? '' : 'muted'}">${esc(money(t.inv.total))}</span>` : ''}</td><td class="num muted">${INV_IN.includes(t.inv.act) || INV_OUT.includes(t.inv.act) ? fmtQ(posAfter.get(t.id)) : ''}</td></tr>`
+        : `<tr class="click" data-tx="${t.id}"><td>${fmtDate(t.date)}</td><td colspan="4">${esc(t.payee)} <span class="muted">${txCategoryLabel(t)}</span></td><td class="num">${moneyHTML(t.amount)}</td><td></td></tr>`).join('')}
+      </tbody></table>${rows.length > shown.length ? `<div class="more"><button class="btn" data-act="show-more">Oudere transacties tonen (nog ${(rows.length - shown.length).toLocaleString('nl-NL')})</button></div>` : ''}` : '<p class="muted" style="padding:18px">Geen transacties.</p>'}</div>
+  </div>`;
+}
+function openInvDetails(t) {
+  const i = t.inv;
+  const w = openModal({ title: esc(invLabel(i.act)) + ' — ' + esc(i.sec), body: `<table class="t">
+    <tr><td>Datum</td><td>${fmtDate(t.date)}</td></tr><tr><td>Actie</td><td>${esc(invLabel(i.act))}</td></tr><tr><td>Effect</td><td>${esc(i.sec)}</td></tr>
+    ${i.qty != null ? `<tr><td>Aantal</td><td>${i.qty.toLocaleString('nl-NL', { maximumFractionDigits: 4 })}</td></tr>` : ''}${i.price != null ? `<tr><td>Koers</td><td>${i.price.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td></tr>` : ''}
+    ${i.comm ? `<tr><td>Kosten</td><td>${esc(money(i.comm))}</td></tr>` : ''}<tr><td>Bedrag</td><td>${esc(money(i.total))}</td></tr>${t.memo ? `<tr><td>Notitie</td><td>${esc(t.memo)}</td></tr>` : ''}</table>
+    <div class="modal-actions"><button class="btn danger" data-invdel>Verwijderen</button><span class="spacer"></span><button class="btn primary" data-close>Sluiten</button></div>` });
+  $('[data-invdel]', w).onclick = async () => { if (!await confirmBox('Deze regel verwijderen?', '<p>Dit kan niet ongedaan worden gemaakt.</p>', 'Verwijderen', true)) return; deleteTx(t); changed(); closeModal(w); render(); };
 }
 function idxTx(id) { return DB.transactions.find(t => t.id === id); }
 
@@ -2461,7 +2588,7 @@ const payeeKeys = s => { const w = payeeWords(s); return [w.slice(0, 3).join(' '
 function buildGuesser() {
   const byCp = new Map(), byPayee = new Map();
   for (const t of DB.transactions.slice().sort(cmpTx)) {
-    if (t.linkId || t.ob) continue;
+    if (t.linkId || t.ob || (t.inv && !t.categoryId)) continue;
     const g = t.splits && t.splits.length ? null : t.transferAccountId ? { transfer: t.transferAccountId } : t.categoryId ? { cat: t.categoryId } : null;
     if (!g) continue;
     if (t.cp) byCp.set(t.cp, g);
@@ -2587,6 +2714,10 @@ async function readCsvFiles(files) {
 
 
 function qifPreview(g, f) {
+  if (g.type === 'invest') {
+    const c = {}; for (const r of g.records) { const l = invLabel(invBase(r.N)); c[l] = (c[l] || 0) + 1; }
+    return `<p class="hint">Beleggingshistorie: ${Object.entries(c).map(([k, v]) => v + '× ' + esc(k.toLowerCase())).join(', ')}. Wordt opgenomen als overzicht in euro's; de geldbedragen worden op de kasrekening hieronder geboekt.</p>`;
+  }
   const counts = { cat: 0, xfer: 0, none: 0, split: 0 };
   for (const r of g.records) {
     const lf = splitCatField(r.L);
@@ -2613,6 +2744,11 @@ function viewImport() {
         <div style="margin-bottom:8px"><b>${esc(g.qifName)}</b> <span class="muted">· ${g.records.length.toLocaleString('nl-NL')} transacties${g.firstDate ? ` · ${esc(g.firstDate)} … ${esc(g.lastDate)}` : ''}</span></div>
         ${g.fromFile ? `<p class="hint" style="color:var(--warn-ink)">De naam van deze rekening stond niet in het bestand en is overgenomen van de bestandsnaam. Geef de rekening hieronder dezelfde naam als in Money, anders komen overboekingen vanuit andere rekeningen in een aparte rekening terecht.</p>` : ''}
         ${qifPreview(g, f)}
+        ${g.type === 'invest' && !g.skip ? `<label style="margin:0 0 10px">Het geld van deze belegging (koop, verkoop, dividend, rente) staat op<select data-imp="${fi}:${gi}:cash">
+          <option value="none" ${g.cash === 'none' ? 'selected' : ''}>— nergens boeken, alleen als overzicht —</option>
+          ${p.files.flatMap((f2, fi2) => f2.accounts.map((g2, gi2) => g2.type === 'invest' || g2.skip ? '' : `<option value="plan:${fi2}:${gi2}" ${g.cash === 'plan:' + fi2 + ':' + gi2 ? 'selected' : ''}>${esc(g2.target === 'new' ? g2.newName : accName(g2.target))} (uit ${esc(f2.name)})</option>`)).join('')}
+          ${DB.accounts.filter(a => a.type !== 'invest').map(a => `<option value="${a.id}" ${g.cash === a.id ? 'selected' : ''}>${esc(a.name)} (al in Kasboek)</option>`).join('')}</select>
+          <span class="hint">${g.cashGuessed ? 'Automatisch gevonden: de transacties van die rekening tellen op tot precies het tegenovergestelde, dus daar hoort het geld bij.' : `Kies de kasrekening die bij deze belegging hoort (in Money de gekoppelde rekening). Samen ${esc(money(g.cashEffect || 0))}.`}</span></label>` : ''}
         <div class="grid2">
           <label style="margin:0">Importeren in<select data-imp="${fi}:${gi}:target">
             <option value="new" ${g.target === 'new' ? 'selected' : ''}>Een nieuwe rekening met de naam…</option>
@@ -2791,12 +2927,13 @@ function afterRender() {
 }
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-kp],[data-kpun],[data-kpview],[data-go],[data-acc],[data-act],[data-tx],[data-status],[data-recon],[data-rtype],[data-drill],[data-rdrill],[data-cat-sub],[data-cat-ren],[data-cat-kind],[data-cat-del]');
+  const el = e.target.closest('[data-invsec],[data-kp],[data-kpun],[data-kpview],[data-go],[data-acc],[data-act],[data-tx],[data-status],[data-recon],[data-rtype],[data-drill],[data-rdrill],[data-cat-sub],[data-cat-ren],[data-cat-kind],[data-cat-del]');
   if (!el || el.closest('.modal')) return;
   const d = el.dataset;
   if (d.kp) { e.stopPropagation(); if (e.target.checked) kpState.sel.add(d.kp); else kpState.sel.delete(d.kp); return render(); }
   if (d.kpun) { e.stopPropagation(); if (await confirmBox('Koppeling losmaken?', '<p>De gekoppelde posten komen weer bij de open posten te staan.</p>', 'Losmaken')) kpUnlink(d.kpun); return; }
   if (d.kpview) { kpState.view = d.kpview; return render(); }
+  if (d.invsec != null) { regState.search = d.invsec; regState.shown = 300; return render(); }
   if (d.go) return go(d.go);
   if (d.status) {
     e.stopPropagation();
@@ -2832,6 +2969,7 @@ document.addEventListener('click', async e => {
   if (d.catDel) return deleteCategory(d.catDel);
   switch (d.act) {
     case 'books': return openBooks();
+    case 'inv-clear': regState.search = ''; return render();
     case 'kp-link': return kpLink(idx().acc.get(state.accountId));
     case 'kp-clear': kpState.sel = new Set(); return render();
     case 'kp-auto': {
@@ -2849,7 +2987,7 @@ document.addEventListener('click', async e => {
     case 'edit-account': return openAccountEditor(idx().acc.get(state.accountId));
     case 'new-tx': return openTxEditor(null, state.accountId);
     case 'new-tx-any': {
-      const accs = DB.accounts.filter(a => !a.closed);
+      const accs = DB.accounts.filter(a => !a.closed && a.type !== 'invest');
       if (accs.length === 1) return openTxEditor(null, accs[0].id);
       const w = openModal({ title: 'Welke rekening?', body: `<div class="cards" style="gap:6px">${accs.map(a => `<button class="bigbtn" data-pick="${a.id}" style="padding:10px 14px"><b style="margin:0">${esc(a.name)}</b></button>`).join('')}</div>` });
       $$('[data-pick]', w).forEach(b => b.onclick = () => { closeModal(w); openTxEditor(null, b.dataset.pick); });
@@ -2905,6 +3043,7 @@ document.addEventListener('click', async e => {
       alertBox('Importeren voltooid', `<p><b>${st.tx.toLocaleString('nl-NL')}</b> transacties geïmporteerd${st.matched ? `, <b>${st.matched.toLocaleString('nl-NL')}</b> overboekingen gekoppeld aan de andere rekening` : ''}.</p>
         ${st.newAccounts.length ? `<p>Nieuwe rekeningen: ${st.newAccounts.map(esc).join(', ')}.</p>` : ''}
         ${st.autoAccounts.length ? `<p>Deze rekeningen kwamen alleen voor in overboekingen en zijn daarom aangemaakt met alleen die overboekingen: <b>${st.autoAccounts.map(esc).join(', ')}</b>. Importeer ook hun eigen QIF-bestanden om ze compleet te maken.</p>` : ''}
+        ${st.cashBooked ? `<p>${st.cashBooked.toLocaleString('nl-NL')} geldbedragen van beleggingen (koop, verkoop, dividend, rente) zijn op de bijbehorende kasrekening geboekt.</p>` : ''}
         ${st.cats ? `<p>${st.cats} categorieën aangemaakt.</p>` : ''}
         ${st.dupes ? `<p>${st.dupes.toLocaleString('nl-NL')} transacties stonden al in Kasboek en zijn overgeslagen.</p>` : ''}
         ${st.badDates ? `<p class="neg">${st.badDates} transacties hadden een onleesbare datum en zijn overgeslagen.</p>` : ''}
