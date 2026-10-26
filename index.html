@@ -254,7 +254,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.17 (oktober 2026)';
+const APP_VERSION = '1.18 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -1862,19 +1862,20 @@ function viewReports() {
     csv = [['Maand', 'Waarde']].concat(months.map((m, k) => [m, moneyPlain(vals[k])]));
   } else if (rs.type === 'balances') {
     const asOf = to > todayISO() ? todayISO() : to;
-    const rows = [];
+    const rows = []; let zeroHidden = 0;
     let total = 0;
     for (const [label, types] of ACCOUNT_GROUPS) {
       for (const a of DB.accounts.filter(x => types.includes(x.type)).sort((x, y) => x.name.localeCompare(y.name))) {
         const b = (I.byAcc.get(a.id) || []).filter(t => t.date <= asOf).reduce((s, t) => s + t.amount, 0);
-        if (a.closed && !b) continue;
+        if (!b && (a.closed || sideHideZero)) { if (!a.closed) zeroHidden++; continue; }
         rows.push([label, a.name, b]); total += b;
       }
     }
     content = `<p class="sub" style="margin-top:0">Saldi op ${fmtDate(asOf)} (einde van de gekozen periode).</p>
       <table class="t"><thead><tr><th>Groep</th><th>Rekening</th><th class="num">Saldo</th></tr></thead><tbody>
       ${rows.map(r => `<tr><td class="muted">${esc(r[0])}</td><td>${esc(r[1])}</td><td class="num">${moneyHTML(r[2])}</td></tr>`).join('')}
-      </tbody><tfoot><tr><td></td><td>Vermogen</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>`;
+      </tbody><tfoot><tr><td></td><td>Vermogen</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>
+      ${zeroHidden ? `<p class="hint" style="margin-top:8px">${zeroHidden} ${zeroHidden === 1 ? 'rekening' : 'rekeningen'} met saldo ${esc(money(0))} op deze datum niet getoond.</p>` : ''}`;
     csv = [['Groep', 'Rekening', 'Saldo']].concat(rows.map(r => [r[0], r[1], moneyPlain(r[2])]));
   }
   reportState._csv = csv;
@@ -1885,7 +1886,7 @@ function viewReports() {
     <div class="toolbar">${rs.type === 'year' || rs.type === 'years' ? `${rs.type === 'year' ? `<select id="rp-year">${yearsWithData().map(y => `<option ${y === rs.year ? 'selected' : ''}>${y}</option>`).join('')}</select>`
         : (() => { const [a, b] = yearSpan(), ys = yearsWithData().slice().reverse(); return `<div class="seg seg-inline"><button data-permonth="0" class="${rs.perMonth ? '' : 'on'}">Totaal per jaar</button><button data-permonth="1" class="${rs.perMonth ? 'on' : ''}">Gemiddeld per maand</button></div><label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400">Van <select id="rp-yfrom" style="width:auto">${ys.map(y => `<option ${y === a ? 'selected' : ''}>${y}</option>`).join('')}</select></label><label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400">t/m <select id="rp-yto" style="width:auto">${ys.map(y => `<option ${y === b ? 'selected' : ''}>${y}</option>`).join('')}</select></label>`; })()}
       <label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="rp-subs" ${rs.subs ? 'checked' : ''} style="width:auto;min-height:0"> Subcategorieën tonen</label>
-      <label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="rp-cents" ${rs.cents ? 'checked' : ''} style="width:auto;min-height:0"> Centen tonen</label>` : periodSel} ${showAcc ? accSel : ''}<span class="grow"></span>
+      <label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="rp-cents" ${rs.cents ? 'checked' : ''} style="width:auto;min-height:0"> Centen tonen</label>` : periodSel} ${showAcc ? accSel : ''}${rs.type === 'balances' ? `<label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" data-hidezero-home ${sideHideZero ? 'checked' : ''} style="width:auto;min-height:0"> Saldo ${esc(money(0))} verbergen</label>` : ''}<span class="grow"></span>
       ${csv ? '<button class="btn small" data-act="report-csv">Exporteren naar spreadsheet</button>' : ''}<button class="btn small" data-act="print">Afdrukken</button></div>
     <div class="card"><h2>${esc(title)} <span class="hint">· ${rs.type === 'year' ? rs.year : rs.type === 'years' ? yearSpan().join('–') + (rs.perMonth ? ' · gemiddeld per maand' : '') : esc(periodLabel(rs.period, rs.custom))}${showAcc ? ' · ' + esc(accLabel) : ''}</span></h2>${content}</div>
   </div>`;
