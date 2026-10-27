@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.21 (oktober 2026)';
+const APP_VERSION = '1.22 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -372,14 +372,59 @@ function idx() {
   _idx = { acc, cat, tx, byAcc, legsOf, bal, payeeLast, childrenOf };
   return _idx;
 }
-function changed() { _idx = null; scheduleSave(); }
+function changed() { _idx = null; _fx = null; scheduleSave(); }
 
 /* ---------- formatting ---------- */
-let _nf = null, _nfc = null, _df = null, _mf = null;
-function resetFormats() { _nf = _nfc = _df = _mf = null; }
-function money(c) {
-  if (!_nf) _nf = new Intl.NumberFormat(DB.settings.locale, { style: 'currency', currency: DB.settings.currency });
-  return _nf.format((c || 0) / 100);
+let _nf = null, _nfc = null, _df = null, _mf = null, _nfx = {}, _fx = null;
+function resetFormats() { _nf = _nfc = _df = _mf = null; _nfx = {}; _fx = null; }
+/* the currency amounts are shown in; viewRegister switches it to the account's own currency */
+let displayCur = null;
+function money(c, cur) {
+  cur = cur || displayCur || DB.settings.currency;
+  if (cur === DB.settings.currency) {
+    if (!_nf) _nf = new Intl.NumberFormat(DB.settings.locale, { style: 'currency', currency: DB.settings.currency });
+    return _nf.format((c || 0) / 100);
+  }
+  if (!_nfx[cur]) { try { _nfx[cur] = new Intl.NumberFormat(DB.settings.locale, { style: 'currency', currency: cur }); } catch (e) { _nfx[cur] = { format: v => v.toLocaleString(DB.settings.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + cur }; } }
+  return _nfx[cur].format((c || 0) / 100);
+}
+/* ---------- currencies ---------- */
+const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'AUD', 'CAD', 'NZD', 'JPY', 'CNY', 'HKD', 'SGD', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RON', 'BGN', 'TRY', 'ZAR', 'INR', 'IDR', 'THB', 'MXN', 'BRL', 'ISK', 'ILS', 'KRW', 'PHP', 'MYR'];
+const baseCur = () => DB.settings.currency;
+const accCur = a => (a && a.currency) || baseCur();
+/* value of 1 unit of a currency in the base currency (euro) */
+function rateOf(cur) { if (!cur || cur === baseCur()) return 1; const r = (DB.settings.rates || {})[cur]; return r && r.rate ? r.rate : null; }
+function accFx(accountId) {
+  if (!_fx) { _fx = new Map(); for (const a of DB.accounts) _fx.set(a.id, rateOf(accCur(a)) || 1); }
+  return _fx.has(accountId) ? _fx.get(accountId) : 1;
+}
+const toBase = (c, accountId) => Math.round((c || 0) * accFx(accountId));
+const foreignCurs = () => Array.from(new Set(DB.accounts.map(accCur).filter(c => c !== baseCur())));
+const missingRates = () => foreignCurs().filter(c => !rateOf(c));
+/* exchange rate implied by the latest transfer between a foreign and a base-currency account */
+function rateFromTransfers(cur) {
+  let best = null;
+  for (const t of DB.transactions) {
+    if (t.otherAmount == null || !t.transferAccountId || !t.amount || !t.otherAmount) continue;
+    const a = idx().acc.get(t.accountId), b = idx().acc.get(t.transferAccountId); if (!a || !b) continue;
+    let r = null;
+    if (accCur(a) === cur && accCur(b) === baseCur()) r = Math.abs(t.otherAmount / t.amount);
+    else if (accCur(b) === cur && accCur(a) === baseCur()) r = Math.abs(t.amount / t.otherAmount);
+    if (r && (!best || t.date > best.date)) best = { rate: r, date: t.date };
+  }
+  return best;
+}
+async function fetchRates() {
+  const curs = foreignCurs(); if (!curs.length) return 0;
+  const urls = ['https://api.frankfurter.app/latest?from=' + baseCur() + '&to=' + curs.join(','), 'https://api.frankfurter.dev/v1/latest?base=' + baseCur() + '&symbols=' + curs.join(',')];
+  let data = null;
+  for (const u of urls) { try { const r = await fetch(u); if (r.ok) { data = await r.json(); break; } } catch (e) {} }
+  if (!data || !data.rates) throw new Error('De koersen konden niet worden opgehaald. Is er internet?');
+  DB.settings.rates = DB.settings.rates || {};
+  let n = 0;
+  for (const [cur, perBase] of Object.entries(data.rates)) if (perBase) { DB.settings.rates[cur] = { rate: 1 / perBase, date: data.date || todayISO(), source: 'ECB' }; n++; }
+  resetFormats(); changed();
+  return n;
 }
 function moneyCompact(c) {
   if (!_nfc) _nfc = new Intl.NumberFormat(DB.settings.locale, { style: 'currency', currency: DB.settings.currency, notation: 'compact', maximumFractionDigits: 1 });
@@ -900,7 +945,7 @@ function renderSide() {
   const on = (v, id) => (state.view === v && (!id || state.accountId === id)) ? ' on' : '';
   const scrollY = ($('#side .acclist') || {}).scrollTop || 0;
   const chev = open => `<svg class="chev ${open ? 'open' : ''}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
-  const accBtn = (a, muted) => { const b = I.bal.get(a.id) || 0; return `<button class="nav${on('account', a.id)}" data-acc="${a.id}">${ICONS.acct}<span class="nm ${muted ? 'muted' : ''}">${esc(a.name)}</span>${muted ? '' : `<span class="amt ${b < 0 ? 'neg' : ''}">${esc(money(b))}</span>`}</button>`; };
+  const accBtn = (a, muted) => { const b = I.bal.get(a.id) || 0; return `<button class="nav${on('account', a.id)}" data-acc="${a.id}">${ICONS.acct}<span class="nm ${muted ? 'muted' : ''}">${esc(a.name)}</span>${muted ? '' : `<span class="amt ${b < 0 ? 'neg' : ''}">${esc(money(b, accCur(a)))}</span>`}</button>`; };
   let h = `<div class="brand"><svg width="26" height="26" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M9 21V11M9 16l7-5M9 16l7 5M19 21h5M19 16h5M19 11h5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><span class="t">Kasboek</span></div>
   <button class="bookbtn" data-act="books" title="Andere administratie openen of een nieuwe maken"><span class="nm">${esc(bookName())}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5 5 5-5"/></svg></button>
   <div class="mainnav">
@@ -915,7 +960,7 @@ function renderSide() {
   for (const [label, types] of ACCOUNT_GROUPS) {
     let accs = DB.accounts.filter(a => types.includes(a.type) && !a.closed).sort((a, b) => a.name.localeCompare(b.name));
     if (!accs.length) continue;
-    const total = accs.reduce((t, a) => t + (I.bal.get(a.id) || 0), 0);
+    const total = accs.reduce((t, a) => t + toBase(I.bal.get(a.id) || 0, a.id), 0);
     const open = !sideFolded.has(label);
     const shown = accs.filter(a => open ? (!sideHideZero || (I.bal.get(a.id) || 0) !== 0 || state.accountId === a.id) : state.accountId === a.id && state.view === 'account');
     const hidden = open ? accs.length - shown.length : 0;
@@ -970,8 +1015,8 @@ function categoryFlows(from, to, accountId) {
     if (t.linkId || t.ob || (t.inv && !t.categoryId) || t.date < from || t.date > to) continue;
     if (accountId && accountId !== 'all' && t.accountId !== accountId) continue;
     if (t.splits && t.splits.length) {
-      for (const s of t.splits) { if (s.transferAccountId) continue; add(s.categoryId || (s.amount > 0 ? '_in' : '_out'), s.amount); }
-    } else if (!t.transferAccountId) add(t.categoryId || (t.amount > 0 ? '_in' : '_out'), t.amount);
+      for (const s of t.splits) { if (s.transferAccountId) continue; add(s.categoryId || (s.amount > 0 ? '_in' : '_out'), toBase(s.amount, t.accountId)); }
+    } else if (!t.transferAccountId) add(t.categoryId || (t.amount > 0 ? '_in' : '_out'), toBase(t.amount, t.accountId));
   }
   return flows;
 }
@@ -1033,7 +1078,7 @@ function onUncatPick(id, sel) {
 }
 function viewHome() {
   const I = idx();
-  let net = 0; for (const a of DB.accounts) net += I.bal.get(a.id) || 0;
+  let net = 0; for (const a of DB.accounts) net += toBase(I.bal.get(a.id) || 0, a.id);
   const [from, to] = periodRange('thisMonth');
   const flows = categoryFlows(from, to, 'all');
   const { income, expense } = sumByKind(flows);
@@ -1042,14 +1087,15 @@ function viewHome() {
   for (const [label, types] of ACCOUNT_GROUPS) {
     const accs = DB.accounts.filter(a => types.includes(a.type) && !a.closed).sort((a, b) => a.name.localeCompare(b.name));
     if (!accs.length) continue;
-    const tot = accs.reduce((s, a) => s + (I.bal.get(a.id) || 0), 0);
+    const tot = accs.reduce((s, a) => s + toBase(I.bal.get(a.id) || 0, a.id), 0);
     accHTML += `<tr><td colspan="2" style="padding-top:14px" class="muted"><b>${label}</b></td></tr>`;
-    for (const a of accs) { if (sideHideZero && !(I.bal.get(a.id) || 0)) { zeroHidden++; continue; } accHTML += `<tr class="click" data-acc="${a.id}"><td>${esc(a.name)}</td><td class="num">${moneyHTML(I.bal.get(a.id) || 0)}</td></tr>`; }
+    for (const a of accs) { if (sideHideZero && !(I.bal.get(a.id) || 0)) { zeroHidden++; continue; } const bb = I.bal.get(a.id) || 0, fc = accCur(a) !== baseCur(); accHTML += `<tr class="click" data-acc="${a.id}"><td>${esc(a.name)}</td><td class="num">${fc ? `<span class="muted" style="margin-right:8px">≈ ${esc(money(toBase(bb, a.id)))}</span>` : ''}<span class="${bb < 0 ? 'neg' : ''}">${esc(money(bb, accCur(a)))}</span></td></tr>`; }
     if (accs.length > 1) accHTML += `<tr><td class="muted">Totaal ${label.toLowerCase()}</td><td class="num muted">${esc(money(tot))}</td></tr>`;
   }
   const recent = DB.transactions.filter(t => !t.linkId).sort(cmpTx).slice(-8).reverse();
   return `<div class="page">
     ${backupBanner()}
+    ${missingRates().length ? `<div class="banner"><span class="grow"><b>Wisselkoers ontbreekt voor ${missingRates().join(', ')}.</b> Tot u die invult, telt Kasboek die rekeningen 1 op 1 mee in uw vermogen.</span><button class="btn small" data-go="settings">Koersen instellen</button></div>` : ''}
     ${(() => { const n = uncatList().length; return n ? `<div class="banner info"><span class="grow"><b>${n.toLocaleString('nl-NL')} transacties hebben nog geen categorie.</b> Ze tellen in de rapporten mee als “Zonder categorie”.</span><button class="btn small primary" data-go="uncat">Nakijken</button></div>` : ''; })()}
     <div class="head"><div class="grow"><div class="sub">Vermogen</div><div class="hero ${net < 0 ? 'neg' : ''}">${esc(money(net))}</div></div>
       <button class="btn primary" data-act="new-tx-any">+ Nieuwe transactie</button></div>
@@ -1125,6 +1171,11 @@ function kpUnlink(id) {
   changed(); render();
 }
 function viewRegister() {
+  const a0 = idx().acc.get(state.accountId);
+  displayCur = a0 ? accCur(a0) : null;
+  try { return viewRegisterInner(); } finally { displayCur = null; }
+}
+function viewRegisterInner() {
   const I = idx();
   const a = I.acc.get(state.accountId);
   if (!a) { state = { view: 'home' }; return viewHome(); }
@@ -1184,7 +1235,7 @@ function viewRegister() {
   return `<div class="page">
     <div class="head">
       <div class="grow"><h1>${esc(a.name)}${a.closed ? ' <span class="pill">opgeheven</span>' : ''}</h1>
-        <p class="sub">${esc(typeLabel)} · Saldo <b class="${bal < 0 ? 'neg' : ''}">${esc(money(bal))}</b> · Verwerkt door de bank ${esc(money(clearedBal))}${debt && bal < 0 ? ` · U bent verschuldigd ${esc(money(-bal))}` : ''}</p></div>
+        <p class="sub">${esc(typeLabel)}${accCur(a) !== baseCur() ? ` · ${accCur(a)}${rateOf(accCur(a)) ? ` (≈ ${esc(money(toBase(bal, a.id), baseCur()))})` : ' · <span class="neg">koers ontbreekt</span>'}` : ''} · Saldo <b class="${bal < 0 ? 'neg' : ''}">${esc(money(bal))}</b> · Verwerkt door de bank ${esc(money(clearedBal))}${debt && bal < 0 ? ` · U bent verschuldigd ${esc(money(-bal))}` : ''}</p></div>
       <button class="btn" data-act="edit-account">Rekeninggegevens</button>
       ${inRecon ? '' : '<button class="btn" data-act="recon-start">Afstemmen…</button>'}
       <button class="btn primary" data-act="new-tx">+ Nieuwe transactie</button>
@@ -1288,6 +1339,9 @@ function openTxEditor(tx, accountId, startType) {
     xferTo = d.amount < 0 ? d.transferAccountId : src.accountId;
   }
   if (!src && startType) type = startType;
+  let xferOther = src && src.otherAmount != null && type === 'xfer' ? moneyPlain(Math.abs(src.otherAmount)) : '';
+  // a transfer stored on the receiving side: show the paying side's amount first
+  if (xferOther && d.amount > 0) { xferOther = moneyPlain(Math.abs(d.amount)); d.amount = -Math.abs(src.otherAmount); }
   const sgn = () => type === 'dep' ? 1 : -1;
   let splits = (d.splits && d.splits.length) ? d.splits.map(s => ({ sel: s.transferAccountId ? 't:' + s.transferAccountId : s.categoryId ? 'c:' + s.categoryId : '', memo: s.memo || '', amt: moneyPlain(s.amount * sgn()) })) : null;
 
@@ -1305,7 +1359,7 @@ function openTxEditor(tx, accountId, startType) {
       </div>
       <div id="xfer-area"></div>
       <label><span id="payee-label">Begunstigde</span><input name="payee" list="payee-list" value="${esc(d.payee)}" ${isNew ? 'autofocus' : ''} placeholder="Aan wie betaalde u, of wie betaalde u?"></label>
-      <label>Bedrag<input name="amount" inputmode="decimal" value="${d.amount != null ? esc(moneyPlain(Math.abs(d.amount))) : ''}" placeholder="0${localeDecimal()}00"></label>
+      <label>Bedrag<input name="amount" inputmode="decimal" value="${d.amount != null ? esc(moneyPlain(Math.abs(d.amount))) : ''}" placeholder="0${localeDecimal()}00"></label><div id="xother-area"></div>
       <div id="cat-area"></div>
       <label>Notitie <span class="hint">optioneel</span><input name="memo" value="${esc(d.memo)}"></label>
       <label>Status<select name="status">
@@ -1331,16 +1385,31 @@ function openTxEditor(tx, accountId, startType) {
   }
   function renderXferArea() {
     const el = $('#xfer-area', w);
-    if (type !== 'xfer') { el.innerHTML = ''; return; }
+    if (type !== 'xfer') { el.innerHTML = ''; $('#xother-area', w).innerHTML = ''; return; }
+    const cf = accCur(I.acc.get(xferFrom)), ct = accCur(I.acc.get(xferTo)), fx = xferFrom && xferTo && cf !== ct;
     el.innerHTML = `<div class="xfer-row">
       <label>Van rekening${accSelect('xfrom', xferFrom)}</label>
       <button type="button" class="btn small" data-swap title="De twee rekeningen omwisselen" aria-label="De twee rekeningen omwisselen">⇄</button>
-      <label>Naar rekening${accSelect('xto', xferTo)}</label></div>`;
-    $('select[name=xfrom]', el).onchange = e => { xferFrom = e.target.value; };
-    $('select[name=xto]', el).onchange = e => { xferTo = e.target.value; };
-    $('[data-swap]', el).onclick = () => { [xferFrom, xferTo] = [xferTo, xferFrom]; renderXferArea(); };
+      <label>Naar rekening${accSelect('xto', xferTo)}</label></div>
+`;
+    $('#xother-area', w).innerHTML = fx ? `<label>Bedrag dat op ${esc(accName(xferTo))} binnenkomt, in ${ct} <span class="hint">(het bedrag dat afgaat is in ${cf})</span><input name="xother" inputmode="decimal" value="${esc(xferOther)}" placeholder="0${localeDecimal()}00"></label>` : '';;
+    $('select[name=xfrom]', el).onchange = e => { xferFrom = e.target.value; renderXferArea(); updateAmountLabel(); };
+    $('select[name=xto]', el).onchange = e => { xferTo = e.target.value; renderXferArea(); updateAmountLabel(); };
+    $('[data-swap]', el).onclick = () => { [xferFrom, xferTo] = [xferTo, xferFrom]; xferOther = ''; renderXferArea(); updateAmountLabel(); };
+    const xo = $('input[name=xother]', w);
+    if (xo) {
+      xo.oninput = () => { xferOther = xo.value; };
+      // suggest the other amount from the exchange rates
+      if (!xferOther) { const a = parseUserAmount(f.amount.value), rf = rateOf(cf), rt = rateOf(ct); if (a != null && rf && rt) { xferOther = moneyPlain(Math.round(Math.abs(a) * rf / rt)); xo.value = xferOther; xo.dataset.suggested = '1'; } }
+    }
+  }
+  function updateAmountLabel() {
+    const lab = f.amount.closest('label'); if (!lab) return;
+    const cur = accCur(I.acc.get(type === 'xfer' ? xferFrom : acctId));
+    lab.firstChild.textContent = cur !== baseCur() ? 'Bedrag in ' + cur : 'Bedrag';
   }
   function updateSeg() {
+    updateAmountLabel();
     $$('.seg button', w).forEach(b => b.classList.toggle('on', b.dataset.type === type));
     const x = type === 'xfer';
     $('#cat-area', w).style.display = x ? 'none' : '';
@@ -1415,6 +1484,7 @@ function openTxEditor(tx, accountId, startType) {
     el.innerHTML = left === 0 ? `<span style="color:var(--pos)">✓ De regels tellen op tot het bedrag</span>` : `Nog te verdelen: <b class="${left < 0 ? 'neg' : ''}">${esc(money(left))}</b>`;
   }
   f.amount.addEventListener('input', updateSplitSum);
+  f.amount.addEventListener('input', () => { const xo = $('input[name=xother]', w); if (xo && (xo.dataset.suggested || !xo.value)) { xferOther = ''; renderXferArea(); } });
   renderCatArea();
   updateSeg();
 
@@ -1457,8 +1527,13 @@ function openTxEditor(tx, accountId, startType) {
     }
     if (amt == null) { err.textContent = 'Vul een bedrag in.'; f.amount.focus(); return false; }
     if (amt === 0 && !d.ob) { err.textContent = 'Het bedrag kan niet nul zijn.'; return false; }
+    let otherAmt = null;
     if (type === 'xfer') {
       if (!xferFrom || !xferTo) { err.textContent = 'Kies beide rekeningen voor de overboeking.'; return false; }
+      if (accCur(idx().acc.get(xferFrom)) !== accCur(idx().acc.get(xferTo))) {
+        const o = parseUserAmount(xferOther); if (o == null || !o) { err.textContent = 'Vul ook het bedrag in dat op de andere rekening binnenkomt (andere valuta).'; return false; }
+        otherAmt = Math.abs(o);
+      }
       if (xferFrom === xferTo) { err.textContent = 'De twee rekeningen van een overboeking moeten verschillend zijn.'; return false; }
     }
     const fields = type === 'xfer' ? {
@@ -1470,6 +1545,7 @@ function openTxEditor(tx, accountId, startType) {
     };
     let t;
     if (isNew) t = newTx(fields); else { t = DB.transactions.find(x => x.id === src.id); if (t.otherAmount != null && (fields.amount !== src.amount || fields.accountId !== src.accountId || fields.transferAccountId !== src.transferAccountId)) delete t.otherAmount; Object.assign(t, fields); }
+    if (type === 'xfer') { if (otherAmt != null) t.otherAmount = otherAmt; else delete t.otherAmount; }
     syncLegs(t);
     lastEnteredDate = date;
     changed();
@@ -1497,6 +1573,7 @@ function openAccountEditor(acc) {
     <label>Soort rekening<select name="type">${ACCOUNT_TYPES.map(([k, l]) => `<option value="${k}" ${a.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     ${isNew ? `<div class="grid2"><label>Saldo nu <span class="hint" id="obhint">wat er nu op de rekening staat</span><input name="ob" inputmode="decimal" placeholder="0${localeDecimal()}00"></label>
       <label>Op datum<input type="date" name="obdate" value="${todayISO()}"></label></div>` : ''}
+    <label>Valuta<select name="currency">${(() => { const cur = a.currency || baseCur(); return Array.from(new Set([cur, ...CURRENCIES])).map(c => `<option ${c === cur ? 'selected' : ''}>${c}</option>`).join(''); })()}</select></label>
     <label>IBAN <span class="hint">optioneel; nodig om overboekingen tussen uw rekeningen bij het importeren te herkennen</span><input name="iban" value="${esc(a.iban || '')}" placeholder="NL00 BANK 0123 4567 89" autocomplete="off"></label>
     <label>Opmerking <span class="hint">optioneel</span><input name="note" value="${esc(a.note || '')}"></label>
     <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="openitems" ${usesOpenItems(a) ? 'checked' : ''} style="width:auto;min-height:0"> Open posten bijhouden (afletteren), bijvoorbeeld voor kruisposten</label>
@@ -1514,14 +1591,15 @@ function openAccountEditor(acc) {
     if (!name) { $('.err', w).textContent = 'Vul een naam in.'; return; }
     if (DB.accounts.some(x => x !== acc && x.name.toLowerCase() === name.toLowerCase())) { $('.err', w).textContent = 'Er is al een rekening met deze naam.'; return; }
     if (isNew) {
-      const na = { id: uid(), name, type: f.type.value, note: f.note.value.trim(), iban: normIban(f.iban.value), openItems: f.openitems.checked, closed: false };
+      const na = { id: uid(), name, type: f.type.value, note: f.note.value.trim(), iban: normIban(f.iban.value), openItems: f.openitems.checked, currency: f.currency.value, closed: false };
       DB.accounts.push(na);
       let ob = parseUserAmount(f.ob.value) || 0;
       if (isDebtType(na.type)) ob = -Math.abs(ob);
       if (ob) newTx({ accountId: na.id, date: f.obdate.value || todayISO(), amount: ob, payee: 'Beginsaldo', ob: true, status: 'R' });
       changed(); closeModal(w); go('account', { accountId: na.id });
     } else {
-      Object.assign(acc, { name, type: f.type.value, note: f.note.value.trim(), iban: normIban(f.iban.value), openItems: f.openitems.checked, closed: f.closed.checked });
+      Object.assign(acc, { name, type: f.type.value, note: f.note.value.trim(), iban: normIban(f.iban.value), openItems: f.openitems.checked, currency: f.currency.value, closed: f.closed.checked });
+      resetFormats();
       changed(); closeModal(w); render();
     }
   };
@@ -1706,8 +1784,8 @@ function gridFlows(accountId, n, colOf) {
     if (accountId !== 'all' && t.accountId !== accountId) continue;
     const mi = colOf(t.date);
     if (mi < 0) continue;
-    if (t.splits && t.splits.length) { for (const s of t.splits) if (!s.transferAccountId) add(s.categoryId || (s.amount > 0 ? '_in' : '_out'), mi, s.amount); }
-    else if (!t.transferAccountId) add(t.categoryId || (t.amount > 0 ? '_in' : '_out'), mi, t.amount);
+    if (t.splits && t.splits.length) { for (const s of t.splits) if (!s.transferAccountId) add(s.categoryId || (s.amount > 0 ? '_in' : '_out'), mi, toBase(s.amount, t.accountId)); }
+    else if (!t.transferAccountId) add(t.categoryId || (t.amount > 0 ? '_in' : '_out'), mi, toBase(t.amount, t.accountId));
   }
   return m;
 }
@@ -1766,8 +1844,8 @@ function txForCategories(from, to, accountId, ids) {
   for (const t of DB.transactions) {
     if (t.linkId || t.ob || (t.inv && !t.categoryId) || t.date < from || t.date > to) continue;
     if (accountId !== 'all' && t.accountId !== accountId) continue;
-    if (t.splits && t.splits.length) { for (const s of t.splits) if (!s.transferAccountId && set.has(s.categoryId || (s.amount > 0 ? '_in' : '_out'))) out.push({ t, amount: s.amount, memo: s.memo || t.memo }); }
-    else if (!t.transferAccountId && set.has(t.categoryId || (t.amount > 0 ? '_in' : '_out'))) out.push({ t, amount: t.amount, memo: t.memo });
+    if (t.splits && t.splits.length) { for (const s of t.splits) if (!s.transferAccountId && set.has(s.categoryId || (s.amount > 0 ? '_in' : '_out'))) out.push({ t, amount: toBase(s.amount, t.accountId), memo: s.memo || t.memo }); }
+    else if (!t.transferAccountId && set.has(t.categoryId || (t.amount > 0 ? '_in' : '_out'))) out.push({ t, amount: toBase(t.amount, t.accountId), memo: t.memo });
   }
   return out.sort((a, b) => cmpTx(a.t, b.t));
 }
@@ -1784,8 +1862,8 @@ function txForCategory(from, to, accountId, catId) {
   for (const t of DB.transactions) {
     if (t.linkId || t.ob || (t.inv && !t.categoryId) || t.date < from || t.date > to) continue;
     if (accountId !== 'all' && t.accountId !== accountId) continue;
-    if (t.splits && t.splits.length) { for (const s of t.splits) if ((s.categoryId || (s.transferAccountId ? null : (s.amount > 0 ? '_in' : '_out'))) === catId) out.push({ t, amount: s.amount, memo: s.memo || t.memo }); }
-    else if (!t.transferAccountId && (t.categoryId || (t.amount > 0 ? '_in' : '_out')) === catId) out.push({ t, amount: t.amount, memo: t.memo });
+    if (t.splits && t.splits.length) { for (const s of t.splits) if ((s.categoryId || (s.transferAccountId ? null : (s.amount > 0 ? '_in' : '_out'))) === catId) out.push({ t, amount: toBase(s.amount, t.accountId), memo: s.memo || t.memo }); }
+    else if (!t.transferAccountId && (t.categoryId || (t.amount > 0 ? '_in' : '_out')) === catId) out.push({ t, amount: toBase(t.amount, t.accountId), memo: t.memo });
   }
   return out.sort((a, b) => cmpTx(a.t, b.t));
 }
@@ -1911,7 +1989,7 @@ function viewReports() {
     const set = new Set(accs);
     const txs = DB.transactions.filter(t => set.has(t.accountId)).sort(cmpTx);
     const vals = []; let run = 0, i = 0;
-    for (const m of months) { const end = m + '-31'; while (i < txs.length && txs[i].date <= end) run += txs[i++].amount; vals.push(run); }
+    for (const m of months) { const end = m + '-31'; while (i < txs.length && txs[i].date <= end) { run += toBase(txs[i].amount, txs[i].accountId); i++; } vals.push(run); }
     content = months.length ? `<div class="chart">${lineSVG(months, vals, rs.account === 'all' ? 'Vermogen' : accName(rs.account))}</div>
       <table class="t" style="margin-top:18px"><thead><tr><th>Eind van de maand</th><th class="num">${rs.account === 'all' ? 'Vermogen' : 'Saldo'}</th><th class="num">Verandering</th></tr></thead><tbody>
       ${months.map((m, k) => `<tr><td>${esc(fmtMonth(m))}</td><td class="num">${moneyHTML(vals[k])}</td><td class="num">${k ? moneyHTML(vals[k] - vals[k - 1]) : ''}</td></tr>`).reverse().join('')}</tbody></table>` : '<p class="muted">Nog geen gegevens.</p>';
@@ -1924,15 +2002,15 @@ function viewReports() {
       for (const a of DB.accounts.filter(x => types.includes(x.type)).sort((x, y) => x.name.localeCompare(y.name))) {
         const b = (I.byAcc.get(a.id) || []).filter(t => t.date <= asOf).reduce((s, t) => s + t.amount, 0);
         if (!b && (a.closed || sideHideZero)) { if (!a.closed) zeroHidden++; continue; }
-        rows.push([label, a.name, b]); total += b;
+        const be = toBase(b, a.id); rows.push([label, a.name, be, accCur(a) !== baseCur() ? b : null, accCur(a)]); total += be;
       }
     }
     content = `<p class="sub" style="margin-top:0">Saldi op ${fmtDate(asOf)} (einde van de gekozen periode).</p>
       <table class="t"><thead><tr><th>Groep</th><th>Rekening</th><th class="num">Saldo</th></tr></thead><tbody>
-      ${rows.map(r => `<tr><td class="muted">${esc(r[0])}</td><td>${esc(r[1])}</td><td class="num">${moneyHTML(r[2])}</td></tr>`).join('')}
+      ${rows.map(r => `<tr><td class="muted">${esc(r[0])}</td><td>${esc(r[1])}</td><td class="num">${r[3] != null ? `<span class="muted" style="margin-right:10px">${esc(money(r[3], r[4]))}</span>` : ''}${moneyHTML(r[2])}</td></tr>`).join('')}
       </tbody><tfoot><tr><td></td><td>Vermogen</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>
       ${zeroHidden ? `<p class="hint" style="margin-top:8px">${zeroHidden} ${zeroHidden === 1 ? 'rekening' : 'rekeningen'} met saldo ${esc(money(0))} op deze datum niet getoond.</p>` : ''}`;
-    csv = [['Groep', 'Rekening', 'Saldo']].concat(rows.map(r => [r[0], r[1], moneyPlain(r[2])]));
+    csv = [['Groep', 'Rekening', 'Saldo (' + baseCur() + ')', 'Saldo in eigen valuta', 'Valuta']].concat(rows.map(r => [r[0], r[1], moneyPlain(r[2]), r[3] != null ? moneyPlain(r[3]) : '', r[4]]));
   }
   reportState._csv = csv;
   const showAcc = rs.type !== 'balances';
@@ -2014,13 +2092,18 @@ function viewSettings() {
         </ol>
         <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-act="fs-create">Gedeeld bestand maken…</button><button class="btn" data-act="fs-open">Bestaand gedeeld bestand openen…</button></div>`}
     </div>
+    ${foreignCurs().length ? `<div class="card"><h2>Wisselkoersen</h2>
+      <p class="sub" style="margin-top:0">Rekeningen in een andere valuta tellen met deze koersen mee in uw vermogen, de totalen en de rapporten. De bedragen op die rekeningen zelf blijven in hun eigen valuta.</p>
+      <table class="t" style="max-width:640px"><tbody>${foreignCurs().map(c => { const r = (DB.settings.rates || {})[c], tr = rateFromTransfers(c); return `<tr><td style="white-space:nowrap"><b>1 ${c}</b> =</td><td style="white-space:nowrap"><input data-rate="${c}" inputmode="decimal" value="${r ? esc(r.rate.toLocaleString(s.locale, { maximumFractionDigits: 6, useGrouping: false })) : ''}" placeholder="koers" style="width:120px"> ${esc(baseCur())}</td><td class="hint">${r ? `${r.source === 'ECB' ? 'ECB' : 'zelf ingevuld'}, ${fmtDate(r.date)}` : '<span class="neg">nog niet ingevuld</span>'}${tr ? ` · laatste overboeking (${fmtDate(tr.date)}): <button class="btn link" data-userate="${c}:${tr.rate}">${tr.rate.toLocaleString(s.locale, { maximumFractionDigits: 4 })} gebruiken</button>` : ''}</td></tr>`; }).join('')}</tbody></table>
+      <div class="row" style="margin-top:12px"><button class="btn" data-act="fetch-rates">Actuele koersen ophalen (ECB)</button></div>
+      <p class="hint" style="margin-top:8px">De rapporten rekenen ook oude transacties om met deze koers, niet met de koers van toen.</p></div>` : ''}
     <div class="card"><h2>Reservekopie</h2>
       <p class="sub" style="margin-top:0">Kasboek bewaart elke wijziging automatisch in deze browser op deze computer. Een reservekopie is uw vangnet: sla er regelmatig een op en bewaar een exemplaar ergens anders (bijvoorbeeld op iCloud Drive of een USB-stick). Laatste reservekopie: <b>${esc(last)}</b>.</p>
       <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-act="save-backup">Reservekopie opslaan</button><button class="btn" data-act="open-backup">Reservekopie openen…</button></div>
     </div>
     <div class="card"><h2>Weergave</h2>
       <div class="grid2">
-        <label>Valuta<select id="set-cur">${cur.map(c => `<option ${s.currency === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+        <label>Hoofdvaluta <span class="hint">voor vermogen en rapporten</span><select id="set-cur">${cur.map(c => `<option ${s.currency === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
         <label>Notatie van getallen en datums<select id="set-loc">${loc.map(([k, l]) => `<option value="${k}" ${s.locale === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <label>Uiterlijk<select id="set-theme"><option value="system" ${s.theme === 'system' ? 'selected' : ''}>Zoals deze computer</option><option value="light" ${s.theme === 'light' ? 'selected' : ''}>Licht</option><option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>Donker</option></select></label>
       </div>
@@ -2906,6 +2989,8 @@ function afterRender() {
   const pc = $('#rp-cat'); if (pc) pc.onchange = () => { reportState.catSel = pc.value ? pc.value.slice(2) : ''; render(); };
   const sc = $('#set-cur'); if (sc) sc.onchange = () => { DB.settings.currency = sc.value; resetFormats(); changed(); render(); };
   const sl = $('#set-loc'); if (sl) sl.onchange = () => { DB.settings.locale = sl.value; resetFormats(); changed(); render(); };
+  $$('[data-rate]').forEach(inp => inp.onchange = () => { const v = parseFloat(String(inp.value).replace(',', '.')); DB.settings.rates = DB.settings.rates || {}; if (v > 0) DB.settings.rates[inp.dataset.rate] = { rate: v, date: todayISO(), source: 'zelf' }; else delete DB.settings.rates[inp.dataset.rate]; resetFormats(); changed(); render(); });
+  $$('[data-userate]').forEach(b => b.onclick = () => { const [c, r] = b.dataset.userate.split(':'); DB.settings.rates = DB.settings.rates || {}; DB.settings.rates[c] = { rate: +r, date: todayISO(), source: 'overboeking' }; resetFormats(); changed(); render(); });
   const sth = $('#set-theme'); if (sth) sth.onchange = () => { DB.settings.theme = sth.value; applyTheme(); changed(); };
   $$('[data-csv]').forEach(el => el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => {
     const [fi, what, key] = el.dataset.csv.split(':'), f = csvPlan.files[+fi];
@@ -2973,6 +3058,7 @@ document.addEventListener('click', async e => {
   if (d.catDel) return deleteCategory(d.catDel);
   switch (d.act) {
     case 'books': return openBooks();
+    case 'fetch-rates': try { const n = await fetchRates(); render(); toast(n + ' koersen opgehaald.'); } catch (err) { alertBox('Koersen ophalen mislukt', esc(err.message)); } return;
     case 'inv-clear': regState.search = ''; return render();
     case 'kp-link': return kpLink(idx().acc.get(state.accountId));
     case 'kp-clear': kpState.sel = new Set(); return render();
