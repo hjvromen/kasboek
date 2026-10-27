@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.22 (oktober 2026)';
+const APP_VERSION = '1.23 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -372,11 +372,11 @@ function idx() {
   _idx = { acc, cat, tx, byAcc, legsOf, bal, payeeLast, childrenOf };
   return _idx;
 }
-function changed() { _idx = null; _fx = null; scheduleSave(); }
+function changed() { _idx = null; _fx = null; _rh = null; scheduleSave(); }
 
 /* ---------- formatting ---------- */
 let _nf = null, _nfc = null, _df = null, _mf = null, _nfx = {}, _fx = null;
-function resetFormats() { _nf = _nfc = _df = _mf = null; _nfx = {}; _fx = null; }
+function resetFormats() { _nf = _nfc = _df = _mf = null; _nfx = {}; _fx = null; _rh = null; }
 /* the currency amounts are shown in; viewRegister switches it to the account's own currency */
 let displayCur = null;
 function money(c, cur) {
@@ -399,6 +399,67 @@ function accFx(accountId) {
   return _fx.has(accountId) ? _fx.get(accountId) : 1;
 }
 const toBase = (c, accountId) => Math.round((c || 0) * accFx(accountId));
+/* exchange rates through time, per currency: sorted dates with their rates.
+   Sources, best first: the ECB history (fetched), otherwise the rates implied by your own transfers;
+   the current rate (settings.rates) always counts from its own date onward. */
+let _rh = null;
+function rateSeries(cur) {
+  if (!_rh) _rh = new Map();
+  if (_rh.has(cur)) return _rh.get(cur);
+  const pts = new Map(), hist = ((DB.settings.rateHist || {})[cur]) || null;
+  if (hist) for (const d in hist) pts.set(d, hist[d]);
+  else for (const t of DB.transactions) {
+    if (t.otherAmount == null || !t.transferAccountId || !t.amount || !t.otherAmount) continue;
+    const a = idx().acc.get(t.accountId), b = idx().acc.get(t.transferAccountId); if (!a || !b) continue;
+    if (accCur(a) === cur && accCur(b) === baseCur()) pts.set(t.date, Math.abs(t.otherAmount / t.amount));
+    else if (accCur(b) === cur && accCur(a) === baseCur()) pts.set(t.date, Math.abs(t.amount / t.otherAmount));
+  }
+  const now = (DB.settings.rates || {})[cur];
+  if (now && now.rate) { for (const d of Array.from(pts.keys())) if (d > now.date) pts.delete(d); pts.set(now.date || todayISO(), now.rate); }
+  const dates = Array.from(pts.keys()).sort(), ser = { dates, rates: dates.map(d => pts.get(d)) };
+  _rh.set(cur, ser); return ser;
+}
+/* value of 1 unit of cur in the base currency on a date: the latest known rate on or before that date */
+function rateAt(cur, date) {
+  if (!cur || cur === baseCur()) return 1;
+  const { dates, rates } = rateSeries(cur);
+  if (!dates.length) return rateOf(cur) || 1;
+  let lo = 0, hi = dates.length - 1;
+  if (date < dates[0]) return rates[0];
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (dates[m] <= date) lo = m; else hi = m - 1; }
+  return rates[lo];
+}
+const accIsForeign = accountId => { const a = idx().acc.get(accountId); return !!a && accCur(a) !== baseCur(); };
+/* an amount on an account, in the base currency at the rate of that day */
+const toBaseAt = (c, accountId, date) => { const a = idx().acc.get(accountId); return a && accCur(a) !== baseCur() ? Math.round((c || 0) * rateAt(accCur(a), date)) : (c || 0); };
+const dayBefore = d => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() - 1); return x.toISOString().slice(0, 10); };
+/* balance of an account at the end of a date */
+function balanceAt(accountId, date) { let b = 0; for (const t of idx().byAcc.get(accountId) || []) if (t.date <= date) b += t.amount; return b; }
+/* value in euros of what flows into or out of a foreign account: a transfer counts at the amount the other side paid or received */
+function fxFlowValue(t) {
+  if (t.transferAccountId && t.linkId) { const src = idx().tx.get(t.linkId); if (src && src.otherAmount != null) return -toBaseAt(src.amount, src.accountId, t.date); }
+  if (t.transferAccountId && !t.linkId && t.otherAmount != null) return -toBaseAt(t.otherAmount, t.transferAccountId, t.date);
+  return toBaseAt(t.amount, t.accountId, t.date);
+}
+/* exchange-rate result over a period: how much more (or less) the money on foreign-currency accounts is worth in euros
+   than what went in and out.  value at the end − value at the start − net flows in euros */
+function fxResult(from, to, accountId) {
+  const today = todayISO(); if (to > today) to = today; if (from > to) return 0;
+  const start = dayBefore(from); let total = 0;
+  for (const a of DB.accounts) {
+    if (accCur(a) === baseCur() || (accountId && accountId !== 'all' && a.id !== accountId)) continue;
+    let b0 = 0, b1 = 0, flows = 0;
+    for (const t of idx().byAcc.get(a.id) || []) {
+      if (t.date <= start) b0 += t.amount;
+      if (t.date <= to) b1 += t.amount;
+      if (t.date >= from && t.date <= to && t.amount) flows += fxFlowValue(t);
+    }
+    const cur = accCur(a);
+    total += Math.round(b1 * rateAt(cur, to)) - Math.round(b0 * rateAt(cur, start)) - flows;
+  }
+  return total;
+}
+const hasForeignIn = accountId => accountId && accountId !== 'all' ? accIsForeign(accountId) : foreignCurs().length > 0;
 const foreignCurs = () => Array.from(new Set(DB.accounts.map(accCur).filter(c => c !== baseCur())));
 const missingRates = () => foreignCurs().filter(c => !rateOf(c));
 /* exchange rate implied by the latest transfer between a foreign and a base-currency account */
@@ -423,8 +484,37 @@ async function fetchRates() {
   DB.settings.rates = DB.settings.rates || {};
   let n = 0;
   for (const [cur, perBase] of Object.entries(data.rates)) if (perBase) { DB.settings.rates[cur] = { rate: 1 / perBase, date: data.date || todayISO(), source: 'ECB' }; n++; }
+  try { await fetchRateHistory(curs); } catch (e) {}
   resetFormats(); changed();
   return n;
+}
+/* the ECB rates for every day since your first transaction on a foreign-currency account (only the missing days are fetched) */
+async function fetchRateHistory(curs) {
+  const H = DB.settings.rateHist = DB.settings.rateHist || {};
+  const firstOf = cur => { let f = null; for (const a of DB.accounts) if (accCur(a) === cur) for (const t of idx().byAcc.get(a.id) || []) if (!f || t.date < f) f = t.date; return f; };
+  for (const cur of curs) {
+    const first = firstOf(cur); if (!first) continue;
+    const have = H[cur] ? Object.keys(H[cur]).sort() : [];
+    const want = first < '1999-01-04' ? '1999-01-04' : first;
+    // covered when the history starts at most ten days after the wanted date (weekends and holidays have no rate)
+    const tenAfter = (() => { const x = new Date(want + 'T12:00:00'); x.setDate(x.getDate() + 10); return x.toISOString().slice(0, 10); })();
+    const from = have.length && have[0] <= tenAfter ? have[have.length - 1] : want;
+    if (from >= todayISO()) continue;
+    const urls = ['https://api.frankfurter.app/' + from + '..?from=' + baseCur() + '&to=' + cur, 'https://api.frankfurter.dev/v1/' + from + '..?base=' + baseCur() + '&symbols=' + cur];
+    let data = null;
+    for (const u of urls) { try { const r = await fetch(u); if (r.ok) { data = await r.json(); break; } } catch (e) {} }
+    if (!data || !data.rates) continue;
+    const h = H[cur] = H[cur] || {};
+    for (const [d, v] of Object.entries(data.rates)) if (v && v[cur]) h[d] = +(1 / v[cur]).toPrecision(6);
+  }
+}
+/* keep the rates up to date by themselves: once a day, when there are foreign-currency accounts and the rates came from the ECB */
+async function autoRates() {
+  const curs = foreignCurs(); if (!curs.length || !navigator.onLine) return;
+  const R = DB.settings.rates || {};
+  if (curs.some(c => R[c] && R[c].source !== 'ECB')) return;
+  if (curs.every(c => R[c] && R[c].fetched === todayISO())) return;
+  try { await fetchRates(); for (const c of curs) if (DB.settings.rates[c]) DB.settings.rates[c].fetched = todayISO(); render(); } catch (e) {}
 }
 function moneyCompact(c) {
   if (!_nfc) _nfc = new Intl.NumberFormat(DB.settings.locale, { style: 'currency', currency: DB.settings.currency, notation: 'compact', maximumFractionDigits: 1 });
@@ -1015,8 +1105,8 @@ function categoryFlows(from, to, accountId) {
     if (t.linkId || t.ob || (t.inv && !t.categoryId) || t.date < from || t.date > to) continue;
     if (accountId && accountId !== 'all' && t.accountId !== accountId) continue;
     if (t.splits && t.splits.length) {
-      for (const s of t.splits) { if (s.transferAccountId) continue; add(s.categoryId || (s.amount > 0 ? '_in' : '_out'), toBase(s.amount, t.accountId)); }
-    } else if (!t.transferAccountId) add(t.categoryId || (t.amount > 0 ? '_in' : '_out'), toBase(t.amount, t.accountId));
+      for (const s of t.splits) { if (s.transferAccountId) continue; add(s.categoryId || (s.amount > 0 ? '_in' : '_out'), toBaseAt(s.amount, t.accountId, t.date)); }
+    } else if (!t.transferAccountId) add(t.categoryId || (t.amount > 0 ? '_in' : '_out'), toBaseAt(t.amount, t.accountId, t.date));
   }
   return flows;
 }
@@ -1784,18 +1874,30 @@ function gridFlows(accountId, n, colOf) {
     if (accountId !== 'all' && t.accountId !== accountId) continue;
     const mi = colOf(t.date);
     if (mi < 0) continue;
-    if (t.splits && t.splits.length) { for (const s of t.splits) if (!s.transferAccountId) add(s.categoryId || (s.amount > 0 ? '_in' : '_out'), mi, toBase(s.amount, t.accountId)); }
-    else if (!t.transferAccountId) add(t.categoryId || (t.amount > 0 ? '_in' : '_out'), mi, toBase(t.amount, t.accountId));
+    if (t.splits && t.splits.length) { for (const s of t.splits) if (!s.transferAccountId) add(s.categoryId || (s.amount > 0 ? '_in' : '_out'), mi, toBaseAt(s.amount, t.accountId, t.date)); }
+    else if (!t.transferAccountId) add(t.categoryId || (t.amount > 0 ? '_in' : '_out'), mi, toBaseAt(t.amount, t.accountId, t.date));
   }
   return m;
 }
 function yearRows(year, accountId, showSubs) {
   const y = String(year);
-  return gridRows(gridFlows(accountId, 12, d => d.slice(0, 4) === y ? +d.slice(5, 7) - 1 : -1), 12, showSubs);
+  return withFx(gridRows(gridFlows(accountId, 12, d => d.slice(0, 4) === y ? +d.slice(5, 7) - 1 : -1), 12, showSubs), accountId,
+    MONTHS_SHORT.map((m, i) => [isoOf(y, i + 1, 1), isoOf(y, i + 1, 31)]));
 }
 function multiYearRows(years, accountId, showSubs) {
   const first = years[0];
-  return gridRows(gridFlows(accountId, years.length, d => { const i = +d.slice(0, 4) - first; return i >= 0 && i < years.length ? i : -1; }), years.length, showSubs);
+  return withFx(gridRows(gridFlows(accountId, years.length, d => { const i = +d.slice(0, 4) - first; return i >= 0 && i < years.length ? i : -1; }), years.length, showSubs), accountId,
+    years.map(y => [y + '-01-01', y + '-12-31']));
+}
+/* add the exchange-rate result as a line under Inkomsten, so that the result matches the change in net worth */
+function withFx(R, accountId, ranges) {
+  if (!hasForeignIn(accountId)) return R;
+  const v = ranges.map(([a, b]) => fxResult(a, b, accountId));
+  if (!v.some(x => x)) return R;
+  R.income.push({ label: 'Koersresultaat vreemde valuta', v, level: 0, ids: [], fx: true });
+  R.totals.income = R.totals.income.map((x, i) => x + v[i]);
+  R.totals.net = R.totals.income.map((x, i) => x - R.totals.expense[i]);
+  return R;
 }
 function gridRows(fl, n, showSubs) {
   const I = idx();
@@ -1844,8 +1946,8 @@ function txForCategories(from, to, accountId, ids) {
   for (const t of DB.transactions) {
     if (t.linkId || t.ob || (t.inv && !t.categoryId) || t.date < from || t.date > to) continue;
     if (accountId !== 'all' && t.accountId !== accountId) continue;
-    if (t.splits && t.splits.length) { for (const s of t.splits) if (!s.transferAccountId && set.has(s.categoryId || (s.amount > 0 ? '_in' : '_out'))) out.push({ t, amount: toBase(s.amount, t.accountId), memo: s.memo || t.memo }); }
-    else if (!t.transferAccountId && set.has(t.categoryId || (t.amount > 0 ? '_in' : '_out'))) out.push({ t, amount: toBase(t.amount, t.accountId), memo: t.memo });
+    if (t.splits && t.splits.length) { for (const s of t.splits) if (!s.transferAccountId && set.has(s.categoryId || (s.amount > 0 ? '_in' : '_out'))) out.push({ t, amount: toBaseAt(s.amount, t.accountId, t.date), memo: s.memo || t.memo }); }
+    else if (!t.transferAccountId && set.has(t.categoryId || (t.amount > 0 ? '_in' : '_out'))) out.push({ t, amount: toBaseAt(t.amount, t.accountId, t.date), memo: t.memo });
   }
   return out.sort((a, b) => cmpTx(a.t, b.t));
 }
@@ -1862,8 +1964,8 @@ function txForCategory(from, to, accountId, catId) {
   for (const t of DB.transactions) {
     if (t.linkId || t.ob || (t.inv && !t.categoryId) || t.date < from || t.date > to) continue;
     if (accountId !== 'all' && t.accountId !== accountId) continue;
-    if (t.splits && t.splits.length) { for (const s of t.splits) if ((s.categoryId || (s.transferAccountId ? null : (s.amount > 0 ? '_in' : '_out'))) === catId) out.push({ t, amount: toBase(s.amount, t.accountId), memo: s.memo || t.memo }); }
-    else if (!t.transferAccountId && (t.categoryId || (t.amount > 0 ? '_in' : '_out')) === catId) out.push({ t, amount: toBase(t.amount, t.accountId), memo: t.memo });
+    if (t.splits && t.splits.length) { for (const s of t.splits) if ((s.categoryId || (s.transferAccountId ? null : (s.amount > 0 ? '_in' : '_out'))) === catId) out.push({ t, amount: toBaseAt(s.amount, t.accountId, t.date), memo: s.memo || t.memo }); }
+    else if (!t.transferAccountId && (t.categoryId || (t.amount > 0 ? '_in' : '_out')) === catId) out.push({ t, amount: toBaseAt(t.amount, t.accountId, t.date), memo: t.memo });
   }
   return out.sort((a, b) => cmpTx(a.t, b.t));
 }
@@ -1939,7 +2041,7 @@ function viewReports() {
     const tails = mc ? 1 : 2, W = N + 1 + tails;
     const tailCells = (v, click) => mc ? `<td class="num tot ${click ? 'yc' : ''}" ${click ? `data-yc="${click}:-"` : ''}>${cell(monthAvg(v))}</td>`
       : `<td class="num tot ${click ? 'yc' : ''}" ${click ? `data-yc="${click}:-"` : ''}>${cell(totalOf(v))}</td><td class="num muted">${cell(avg(v))}</td>`;
-    const line = (r, key, idx2) => `<tr class="${r.group ? 'grp' : ''}"><td class="lbl" style="padding-left:${10 + r.level * 18}px">${esc(r.label)}</td>${shown(r.v).map((v, i) => `<td class="num ${v ? 'yc' : ''}" ${v ? `data-yc="${key}:${idx2}:${i}"` : ''}>${cell(v)}</td>`).join('')}${tailCells(r.v, key + ':' + idx2)}</tr>`;
+    const line = (r, key, idx2) => { const ck = !r.fx; return `<tr class="${r.group ? 'grp' : ''}"><td class="lbl" style="padding-left:${10 + r.level * 18}px"${r.fx ? ' title="Hoeveel uw geld op rekeningen in vreemde valuta in euro\'s meer (of minder) waard werd doordat de koers veranderde"' : ''}>${esc(r.label)}${r.fx ? ' <span class="muted">ⓘ</span>' : ''}</td>${shown(r.v).map((v, i) => `<td class="num ${v && ck ? 'yc' : ''}" ${v && ck ? `data-yc="${key}:${idx2}:${i}"` : ''}>${cell(v)}</td>`).join('')}${tailCells(r.v, ck ? key + ':' + idx2 : '')}</tr>`; };
     const totLine = (label, v, cls) => `<tr class="${cls}"><td class="lbl">${label}</td>${shown(v).map(x => `<td class="num">${num(x)}</td>`).join('')}${mc ? `<td class="num tot">${num(monthAvg(v))}</td>` : `<td class="num tot">${num(totalOf(v))}</td><td class="num">${num(avg(v))}</td>`}</tr>`;
     const head = `<tr><th class="lbl"></th>${cols.map(m => `<th class="num">${m}</th>`).join('')}${mc ? '<th class="num">Gemiddeld</th>' : `<th class="num">Totaal</th><th class="num">${avgLabel}</th>`}</tr>`;
     const sect = (title, kind) => `<tr class="sect"><td colspan="${W}">${title}</td></tr>` + (R[kind].length ? R[kind].map((r, i) => line(r, kind, i)).join('') : `<tr><td class="lbl muted" colspan="${W}">Geen ${title.toLowerCase()} ${emptyIn}.</td></tr>`) + totLine('Totaal ' + title.toLowerCase(), R.totals[kind], 'sub');
@@ -1950,7 +2052,7 @@ function viewReports() {
       <tr class="sect"><td colspan="${W}"></td></tr>
       ${totLine('Inkomsten min uitgaven', R.totals.net, 'net')}
       </tbody></table></div>
-      <p class="hint" style="margin-top:10px">Bedragen in ${esc(DB.settings.currency === 'EUR' ? 'euro' : DB.settings.currency)}${rs.cents ? '' : ', afgerond op hele bedragen (de export naar spreadsheet bevat de centen)'}. <span class="no-print">Klik op een bedrag om de transacties te zien.</span> Overboekingen tussen uw eigen rekeningen tellen niet mee.${mc ? ' Elk bedrag is het gemiddelde per maand in dat jaar; een jaar dat nog niet voorbij is (of waarin uw administratie later begon) wordt gedeeld door het aantal maanden dat al telt.' : rs.type === 'years' && yearSpan()[1] === +todayISO().slice(0, 4) ? ` Het jaar ${todayISO().slice(0, 4)} is nog niet voorbij.` : ''}</p>`;
+      <p class="hint" style="margin-top:10px">Bedragen in ${esc(DB.settings.currency === 'EUR' ? 'euro' : DB.settings.currency)}${rs.cents ? '' : ', afgerond op hele bedragen (de export naar spreadsheet bevat de centen)'}. <span class="no-print">Klik op een bedrag om de transacties te zien.</span> Overboekingen tussen uw eigen rekeningen tellen niet mee.${R.income.some(r => r.fx) ? ' Bedragen in vreemde valuta zijn omgerekend met de koers van de dag zelf; het koersresultaat is wat dat geld daarna door koersveranderingen meer of minder waard werd.' : ''}${mc ? ' Elk bedrag is het gemiddelde per maand in dat jaar; een jaar dat nog niet voorbij is (of waarin uw administratie later begon) wordt gedeeld door het aantal maanden dat al telt.' : rs.type === 'years' && yearSpan()[1] === +todayISO().slice(0, 4) ? ` Het jaar ${todayISO().slice(0, 4)} is nog niet voorbij.` : ''}</p>`;
     const csvTail = v => mc ? [moneyPlain(monthAvg(v))] : [moneyPlain(totalOf(v)), moneyPlain(avg(v))];
     const csvVals = (label, v) => [label, ...shown(v).map(moneyPlain), ...csvTail(v)];
     const csvLine = r => csvVals((r.level ? '   ' : '') + r.label, r.v);
@@ -1958,16 +2060,19 @@ function viewReports() {
       ['Uitgaven'], ...R.expense.map(csvLine), csvVals('Totaal uitgaven', R.totals.expense), csvVals('Inkomsten min uitgaven', R.totals.net)].filter(r => r.length);
   } else if (rs.type === 'incexp') {
     const months = clampMonths(from, to);
-    const inc = [], exp = [];
-    for (const m of months) { const { income, expense } = sumByKind(categoryFlows(m + '-01', m + '-31', rs.account)); inc.push(income); exp.push(expense); }
+    const inc = [], exp = [], fxr = [];
+    const withFxCol = hasForeignIn(rs.account);
+    for (const m of months) { const { income, expense } = sumByKind(categoryFlows(m + '-01', m + '-31', rs.account)); inc.push(income); exp.push(expense); fxr.push(withFxCol ? fxResult(m + '-01', m + '-31', rs.account) : 0); }
+    const showFx = fxr.some(x => x), tf = fxr.reduce((a, b) => a + b, 0);
     const ti = inc.reduce((a, b) => a + b, 0), te = exp.reduce((a, b) => a + b, 0);
     content = months.length ? `<div class="legend"><span><i style="background:var(--s1)"></i>Inkomsten</span><span><i style="background:var(--s2)"></i>Uitgaven</span></div>
       <div class="chart">${columnsSVG(months, [{ name: 'Inkomsten', color: 'var(--s1)', values: inc }, { name: 'Uitgaven', color: 'var(--s2)', values: exp }])}</div>
-      <table class="t" style="margin-top:18px"><thead><tr><th>Maand</th><th class="num">Inkomsten</th><th class="num">Uitgaven</th><th class="num">Verschil</th></tr></thead><tbody>
-      ${months.map((m, i) => `<tr><td>${esc(fmtMonth(m))}</td><td class="num">${esc(money(inc[i]))}</td><td class="num">${esc(money(exp[i]))}</td><td class="num">${moneyHTML(inc[i] - exp[i])}</td></tr>`).reverse().join('')}
-      </tbody><tfoot><tr><td>Totaal</td><td class="num">${esc(money(ti))}</td><td class="num">${esc(money(te))}</td><td class="num">${moneyHTML(ti - te)}</td></tr>
-      <tr><td class="muted">Gemiddeld per maand</td><td class="num muted">${esc(money(Math.round(ti / months.length)))}</td><td class="num muted">${esc(money(Math.round(te / months.length)))}</td><td class="num muted">${esc(money(Math.round((ti - te) / months.length)))}</td></tr></tfoot></table>` : '<p class="muted">Niets geboekt in deze periode.</p>';
-    csv = [['Maand', 'Inkomsten', 'Uitgaven', 'Verschil']].concat(months.map((m, i) => [m, moneyPlain(inc[i]), moneyPlain(exp[i]), moneyPlain(inc[i] - exp[i])]));
+      <table class="t" style="margin-top:18px"><thead><tr><th>Maand</th><th class="num">Inkomsten</th><th class="num">Uitgaven</th>${showFx ? '<th class="num">Koersresultaat</th>' : ''}<th class="num">Verschil</th></tr></thead><tbody>
+      ${months.map((m, i) => `<tr><td>${esc(fmtMonth(m))}</td><td class="num">${esc(money(inc[i]))}</td><td class="num">${esc(money(exp[i]))}</td>${showFx ? `<td class="num">${moneyHTML(fxr[i])}</td>` : ''}<td class="num">${moneyHTML(inc[i] - exp[i] + fxr[i])}</td></tr>`).reverse().join('')}
+      </tbody><tfoot><tr><td>Totaal</td><td class="num">${esc(money(ti))}</td><td class="num">${esc(money(te))}</td>${showFx ? `<td class="num">${moneyHTML(tf)}</td>` : ''}<td class="num">${moneyHTML(ti - te + tf)}</td></tr>
+      <tr><td class="muted">Gemiddeld per maand</td><td class="num muted">${esc(money(Math.round(ti / months.length)))}</td><td class="num muted">${esc(money(Math.round(te / months.length)))}</td>${showFx ? `<td class="num muted">${esc(money(Math.round(tf / months.length)))}</td>` : ''}<td class="num muted">${esc(money(Math.round((ti - te + tf) / months.length)))}</td></tr></tfoot></table>
+      ${showFx ? '<p class="hint" style="margin-top:10px">Koersresultaat: hoeveel uw geld op rekeningen in vreemde valuta in euro\'s meer (of minder) waard werd doordat de koers veranderde. Het telt mee in het verschil.</p>' : ''}` : '<p class="muted">Niets geboekt in deze periode.</p>';
+    csv = [['Maand', 'Inkomsten', 'Uitgaven', ...(showFx ? ['Koersresultaat'] : []), 'Verschil']].concat(months.map((m, i) => [m, moneyPlain(inc[i]), moneyPlain(exp[i]), ...(showFx ? [moneyPlain(fxr[i])] : []), moneyPlain(inc[i] - exp[i] + fxr[i])]));
   } else if (rs.type === 'trend') {
     const months = clampMonths(from, to);
     const cid = rs.catSel;
@@ -1989,7 +2094,13 @@ function viewReports() {
     const set = new Set(accs);
     const txs = DB.transactions.filter(t => set.has(t.accountId)).sort(cmpTx);
     const vals = []; let run = 0, i = 0;
-    for (const m of months) { const end = m + '-31'; while (i < txs.length && txs[i].date <= end) { run += toBase(txs[i].amount, txs[i].accountId); i++; } vals.push(run); }
+    const runAcc = new Map();
+    for (const m of months) {
+      const end = m + '-31', endD = isoOf(+m.slice(0, 4), +m.slice(5, 7), 31), at = endD > todayISO() ? todayISO() : endD;
+      while (i < txs.length && txs[i].date <= end) { runAcc.set(txs[i].accountId, (runAcc.get(txs[i].accountId) || 0) + txs[i].amount); i++; }
+      run = 0; for (const [id, b] of runAcc) run += toBaseAt(b, id, at);
+      vals.push(run);
+    }
     content = months.length ? `<div class="chart">${lineSVG(months, vals, rs.account === 'all' ? 'Vermogen' : accName(rs.account))}</div>
       <table class="t" style="margin-top:18px"><thead><tr><th>Eind van de maand</th><th class="num">${rs.account === 'all' ? 'Vermogen' : 'Saldo'}</th><th class="num">Verandering</th></tr></thead><tbody>
       ${months.map((m, k) => `<tr><td>${esc(fmtMonth(m))}</td><td class="num">${moneyHTML(vals[k])}</td><td class="num">${k ? moneyHTML(vals[k] - vals[k - 1]) : ''}</td></tr>`).reverse().join('')}</tbody></table>` : '<p class="muted">Nog geen gegevens.</p>';
@@ -2002,7 +2113,7 @@ function viewReports() {
       for (const a of DB.accounts.filter(x => types.includes(x.type)).sort((x, y) => x.name.localeCompare(y.name))) {
         const b = (I.byAcc.get(a.id) || []).filter(t => t.date <= asOf).reduce((s, t) => s + t.amount, 0);
         if (!b && (a.closed || sideHideZero)) { if (!a.closed) zeroHidden++; continue; }
-        const be = toBase(b, a.id); rows.push([label, a.name, be, accCur(a) !== baseCur() ? b : null, accCur(a)]); total += be;
+        const be = toBaseAt(b, a.id, asOf); rows.push([label, a.name, be, accCur(a) !== baseCur() ? b : null, accCur(a)]); total += be;
       }
     }
     content = `<p class="sub" style="margin-top:0">Saldi op ${fmtDate(asOf)} (einde van de gekozen periode).</p>
@@ -2096,7 +2207,7 @@ function viewSettings() {
       <p class="sub" style="margin-top:0">Rekeningen in een andere valuta tellen met deze koersen mee in uw vermogen, de totalen en de rapporten. De bedragen op die rekeningen zelf blijven in hun eigen valuta.</p>
       <table class="t" style="max-width:640px"><tbody>${foreignCurs().map(c => { const r = (DB.settings.rates || {})[c], tr = rateFromTransfers(c); return `<tr><td style="white-space:nowrap"><b>1 ${c}</b> =</td><td style="white-space:nowrap"><input data-rate="${c}" inputmode="decimal" value="${r ? esc(r.rate.toLocaleString(s.locale, { maximumFractionDigits: 6, useGrouping: false })) : ''}" placeholder="koers" style="width:120px"> ${esc(baseCur())}</td><td class="hint">${r ? `${r.source === 'ECB' ? 'ECB' : 'zelf ingevuld'}, ${fmtDate(r.date)}` : '<span class="neg">nog niet ingevuld</span>'}${tr ? ` · laatste overboeking (${fmtDate(tr.date)}): <button class="btn link" data-userate="${c}:${tr.rate}">${tr.rate.toLocaleString(s.locale, { maximumFractionDigits: 4 })} gebruiken</button>` : ''}</td></tr>`; }).join('')}</tbody></table>
       <div class="row" style="margin-top:12px"><button class="btn" data-act="fetch-rates">Actuele koersen ophalen (ECB)</button></div>
-      <p class="hint" style="margin-top:8px">De rapporten rekenen ook oude transacties om met deze koers, niet met de koers van toen.</p></div>` : ''}
+      <p class="hint" style="margin-top:8px">De rapporten rekenen elke transactie om met de koers van die dag${Object.keys(DB.settings.rateHist || {}).length ? '' : ' (zolang de koershistorie van de ECB nog niet is opgehaald: met de koersen van uw eigen overboekingen)'}; wat het geld daarna door koersveranderingen meer of minder waard wordt, staat als <b>Koersresultaat</b> in de rapporten. Met internet haalt Kasboek de ECB-koersen elke dag zelf op.</p></div>` : ''}
     <div class="card"><h2>Reservekopie</h2>
       <p class="sub" style="margin-top:0">Kasboek bewaart elke wijziging automatisch in deze browser op deze computer. Een reservekopie is uw vangnet: sla er regelmatig een op en bewaar een exemplaar ergens anders (bijvoorbeeld op iCloud Drive of een USB-stick). Laatste reservekopie: <b>${esc(last)}</b>.</p>
       <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-act="save-backup">Reservekopie opslaan</button><button class="btn" data-act="open-backup">Reservekopie openen…</button></div>
@@ -3181,6 +3292,7 @@ $('#file-qif').addEventListener('change', async e => {
   if (fileHandle && fileStatus === 'ok') syncFile();
   setInterval(checkForOtherComputer, 15000);
   checkForUpdate(); setInterval(checkForUpdate, 30 * 60000);
+  setTimeout(autoRates, 4000);
   window.addEventListener('focus', checkForUpdate);
   window.addEventListener('focus', checkForOtherComputer);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForOtherComputer(); });
