@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.23 (oktober 2026)';
+const APP_VERSION = '1.24 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -607,16 +607,27 @@ async function switchBook(id) {
   try { localStorage.setItem('kasboek-book', id); } catch (e) {}
   location.reload();
 }
+let booksArchOpen = false;
+/* one administratie in the list; archived ones stay available but out of the way */
+const bookRow = b => `<div class="row bookrow ${b.id === BOOK ? 'on' : ''}" style="flex-wrap:wrap"><b style="flex:1;min-width:120px">${esc(b.name)}${b.archived && b.id === BOOK ? ' <span class="pill">gearchiveerd</span>' : ''}</b>${b.id === BOOK ? '<span class="pill">geopend</span>' : `<button class="btn small primary" data-book-open="${b.id}">Openen</button>`}<button class="btn small" data-book-ren="${b.id}">Naam wijzigen</button>${b.archived ? `<button class="btn small" data-book-arch="${b.id}" title="Weer gewoon in de lijst tonen">Terughalen</button>` : b.id !== BOOK ? `<button class="btn small" data-book-arch="${b.id}" title="Uit de lijst halen; de gegevens blijven bewaard">Archiveren</button>` : ''}${b.id !== 'main' && b.id !== BOOK ? `<button class="btn small danger" data-book-del="${b.id}">Verwijderen</button>` : ''}</div>`;
 function openBooks() {
   const w = openModal({ title: 'Administraties', body: `
     <p class="sub" style="margin-top:0">Elke administratie heeft eigen rekeningen, categorieën en rapporten, net als aparte bestanden in Money. Een administratie die u niet als gedeeld bestand opslaat, staat alleen op deze computer.</p>
-    <div class="cards" style="gap:6px;margin:12px 0">${BOOKS.map(b => `<div class="row bookrow ${b.id === BOOK ? 'on' : ''}"><b style="flex:1">${esc(b.name)}</b>${b.id === BOOK ? '<span class="pill">geopend</span>' : `<button class="btn small primary" data-book-open="${b.id}">Openen</button>`}<button class="btn small" data-book-ren="${b.id}">Naam wijzigen</button>${b.id !== 'main' && b.id !== BOOK ? `<button class="btn small danger" data-book-del="${b.id}">Verwijderen</button>` : ''}</div>`).join('')}</div>
+    <div class="cards" style="gap:6px;margin:12px 0">${BOOKS.filter(b => !b.archived || b.id === BOOK).map(bookRow).join('')}</div>
+    ${BOOKS.some(b => b.archived && b.id !== BOOK) ? `<details class="archived-books" ${booksArchOpen ? 'open' : ''} style="margin:0 0 14px"><summary class="muted" style="cursor:pointer">Gearchiveerd (${BOOKS.filter(b => b.archived && b.id !== BOOK).length})</summary>
+      <div class="cards" style="gap:6px;margin:8px 0 0">${BOOKS.filter(b => b.archived && b.id !== BOOK).map(bookRow).join('')}</div></details>` : ''}
     <form id="newbook" class="row" style="flex-wrap:wrap;align-items:flex-end">
       <label style="flex:1;margin:0;min-width:200px">Nieuwe administratie<input name="name" placeholder="bijv. Persoonlijk"></label>
       <label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" name="cats" checked style="width:auto;min-height:0"> Categorieën van “${esc(bookName())}” overnemen</label>
       <button class="btn primary">Aanmaken en openen</button>
     </form>` });
   $$('[data-book-open]', w).forEach(b => b.onclick = () => switchBook(b.dataset.bookOpen));
+  const det = $('details.archived-books', w); if (det) det.ontoggle = () => { booksArchOpen = det.open; };
+  $$('[data-book-arch]', w).forEach(b => b.onclick = async () => {
+    const bk = BOOKS.find(x => x.id === b.dataset.bookArch);
+    if (bk.archived) { delete bk.archived; } else { bk.archived = true; }
+    await saveBooks(); closeModal(w); openBooks(); toast(bk.archived ? '“' + bk.name + '” is gearchiveerd. U vindt de administratie onder “Gearchiveerd”.' : '“' + bk.name + '” staat weer in de lijst.');
+  });
   $$('[data-book-ren]', w).forEach(b => b.onclick = async () => {
     const bk = BOOKS.find(x => x.id === b.dataset.bookRen); const n = await promptBox('Naam wijzigen', 'Naam van de administratie', bk.name);
     if (n) { bk.name = n; await saveBooks(); closeModal(w); renderSide(); updateSaveStatus(); document.title = 'Kasboek – ' + bookName(); openBooks(); }
