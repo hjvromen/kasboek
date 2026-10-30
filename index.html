@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.25 (oktober 2026)';
+const APP_VERSION = '1.24 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -943,12 +943,9 @@ function catOptions(selected, excludeAccountId, opts = {}) {
   let h = `<option value="">${opts.noneLabel || '— Geen categorie —'}</option>`;
   const xfer = () => {
     if (opts.noTransfers) return '';
-    const all = DB.accounts.filter(a => a.id !== excludeAccountId).sort((a, b) => a.name.localeCompare(b.name));
-    const accs = all.filter(a => !a.closed), shut = all.filter(a => a.closed);
-    const opt = a => `<option value="t:${a.id}" ${selected === 't:' + a.id ? 'selected' : ''}>↔ Overboeken: ${esc(a.name)}</option>`;
-    return `<optgroup label="Overboeken naar / van rekening">` + (accs.length ? accs.map(opt).join('')
-      : `<option disabled>(Voeg eerst een tweede rekening toe)</option>`) + `</optgroup>`
-      + (shut.length ? `<optgroup label="Overboeken naar / van opgeheven rekening">${shut.map(opt).join('')}</optgroup>` : '');
+    const accs = DB.accounts.filter(a => a.id !== excludeAccountId && (!a.closed || selected === 't:' + a.id)).sort((a, b) => a.name.localeCompare(b.name));
+    return `<optgroup label="Overboeken naar / van rekening">` + (accs.length ? accs.map(a => `<option value="t:${a.id}" ${selected === 't:' + a.id ? 'selected' : ''}>↔ Overboeken: ${esc(a.name)}</option>`).join('')
+      : `<option disabled>(Voeg eerst een tweede rekening toe)</option>`) + `</optgroup>`;
   };
   if (opts.transfersFirst) h += xfer();
   for (const [kind, label] of [['expense', 'Uitgaven'], ['income', 'Inkomsten']]) {
@@ -1484,9 +1481,8 @@ function openTxEditor(tx, accountId, startType) {
   const err = $('#txerr', w);
 
   function accSelect(name, selected) {
-    const all = DB.accounts.slice().sort((a, b) => a.name.localeCompare(b.name)), shut = all.filter(a => a.closed);
-    const opt = a => `<option value="${a.id}" ${a.id === selected ? 'selected' : ''}>${esc(a.name)}</option>`;
-    return `<select name="${name}">${selected ? '' : '<option value="">— Kies een rekening —</option>'}${all.filter(a => !a.closed).map(opt).join('')}${shut.length ? `<optgroup label="Opgeheven rekeningen">${shut.map(opt).join('')}</optgroup>` : ''}</select>`;
+    const accs = DB.accounts.filter(a => !a.closed || a.id === selected).sort((a, b) => a.name.localeCompare(b.name));
+    return `<select name="${name}">${selected ? '' : '<option value="">— Kies een rekening —</option>'}${accs.map(a => `<option value="${a.id}" ${a.id === selected ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`;
   }
   function renderXferArea() {
     const el = $('#xfer-area', w);
