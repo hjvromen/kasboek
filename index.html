@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.24 (oktober 2026)';
+const APP_VERSION = '1.26 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -1238,6 +1238,7 @@ function kpBar(a, all) {
     <span class="spacer"></span>
     ${sel.length ? `<button class="btn ${selSum === 0 && sel.length > 1 ? 'primary' : ''}" data-act="kp-link" ${selSum === 0 && sel.length > 1 ? '' : 'disabled'}>Koppelen</button><button class="btn" data-act="kp-clear">Vinkjes wissen</button>` : ''}
     <button class="btn" data-act="kp-auto">Gelijke bedragen automatisch koppelen…</button>
+    ${all.length > open.length ? `<button class="btn" data-act="kp-unall" title="Alle koppelingen op deze rekening ongedaan maken, om opnieuw te controleren">Alle koppelingen losmaken…</button>` : ''}
     <div style="flex-basis:100%;font-size:13px;color:var(--ink-2)">Vink posten aan die samen ${esc(money(0))} zijn en klik op Koppelen; ze verdwijnen dan uit de open posten. Klik op 🔗 bij een gekoppelde post om de koppeling weer los te maken.</div>
   </div>`;
 }
@@ -3184,6 +3185,15 @@ document.addEventListener('click', async e => {
     case 'inv-clear': regState.search = ''; return render();
     case 'kp-link': return kpLink(idx().acc.get(state.accountId));
     case 'kp-clear': kpState.sel = new Set(); return render();
+    case 'kp-unall': {
+      const a = idx().acc.get(state.accountId), linked = (idx().byAcc.get(a.id) || []).filter(t => t.match);
+      if (!linked.length) return;
+      if (!await confirmBox('Alle koppelingen losmaken?', `<p>De ${linked.length.toLocaleString('nl-NL')} gekoppelde posten op “${esc(a.name)}” worden weer open posten, zodat u ze opnieuw kunt controleren en koppelen. De transacties zelf blijven ongewijzigd.</p>`, 'Alles losmaken', true)) return;
+      const groups = new Set(linked.map(t => t.match));
+      for (const x of DB.transactions) if (x.match && groups.has(x.match)) delete x.match;
+      kpState.sel = new Set(); kpState.view = 'open'; changed(); render();
+      return toast(linked.length.toLocaleString('nl-NL') + ' posten losgemaakt.');
+    }
     case 'kp-auto': {
       const a = idx().acc.get(state.accountId), pairs = kpAutoPairs(a);
       if (!pairs.length) return alertBox('Niets om automatisch te koppelen', '<p>Er zijn geen open posten met hetzelfde bedrag en een tegengesteld teken.</p>');
