@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.26 (oktober 2026)';
+const APP_VERSION = '1.27 (oktober 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -437,6 +437,9 @@ const dayBefore = d => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDat
 function balanceAt(accountId, date) { let b = 0; for (const t of idx().byAcc.get(accountId) || []) if (t.date <= date) b += t.amount; return b; }
 /* value in euros of what flows into or out of a foreign account: a transfer counts at the amount the other side paid or received */
 function fxFlowValue(t) {
+  if (t.linkId && t.linkKey != null && t.linkKey >= 0) { const src = idx().tx.get(t.linkId), sp = src && src.splits && src.splits[t.linkKey]; if (sp && sp.otherAmount != null) return -toBaseAt(sp.amount, src.accountId, t.date); }
+  if (!t.linkId && t.splits && t.splits.length && t.splits.some(x => x.otherAmount != null))
+    return t.splits.reduce((v, x) => v + (x.transferAccountId && x.otherAmount != null ? -toBaseAt(x.otherAmount, x.transferAccountId, t.date) : toBaseAt(x.amount, t.accountId, t.date)), 0);
   if (t.transferAccountId && t.linkId) { const src = idx().tx.get(t.linkId); if (src && src.otherAmount != null) return -toBaseAt(src.amount, src.accountId, t.date); }
   if (t.transferAccountId && !t.linkId && t.otherAmount != null) return -toBaseAt(t.otherAmount, t.transferAccountId, t.date);
   return toBaseAt(t.amount, t.accountId, t.date);
@@ -755,7 +758,7 @@ function repairLinks() {
     if (t.transferAccountId && !accIds.has(t.transferAccountId)) t.transferAccountId = null;
     if (t.splits) for (const s of t.splits) if (s.transferAccountId && !accIds.has(s.transferAccountId)) s.transferAccountId = null;
     const want = [];
-    if (t.splits && t.splits.length) t.splits.forEach((s, i) => { if (s.transferAccountId && s.transferAccountId !== t.accountId) want.push(i + ':' + s.transferAccountId + ':' + (-s.amount)); });
+    if (t.splits && t.splits.length) t.splits.forEach((s, i) => { if (s.transferAccountId && s.transferAccountId !== t.accountId) want.push(i + ':' + s.transferAccountId + ':' + (s.otherAmount != null ? s.otherAmount : -s.amount)); });
     else if (t.transferAccountId && t.transferAccountId !== t.accountId) want.push('-1:' + t.transferAccountId + ':' + (t.otherAmount != null ? t.otherAmount : -t.amount));
     const have = (legs.get(t.id) || []).map(l => (l.linkKey == null ? -1 : l.linkKey) + ':' + l.accountId + ':' + l.amount + (l.date === t.date ? '' : '!'));
     if (want.sort().join('|') !== have.sort().join('|')) syncLegs(t);
@@ -971,7 +974,7 @@ function newTx(fields) { const t = Object.assign({ id: uid(), seq: DB.seq++, pay
 function syncLegs(src) {
   const want = [];
   if (src.splits && src.splits.length) {
-    src.splits.forEach((s, i) => { if (s.transferAccountId && s.transferAccountId !== src.accountId) want.push({ k: i, acc: s.transferAccountId, amt: -s.amount, memo: s.memo || src.memo }); });
+    src.splits.forEach((s, i) => { if (s.transferAccountId && s.transferAccountId !== src.accountId) want.push({ k: i, acc: s.transferAccountId, amt: s.otherAmount != null ? s.otherAmount : -s.amount, memo: s.memo || src.memo }); });
   } else if (src.transferAccountId && src.transferAccountId !== src.accountId) {
     want.push({ k: -1, acc: src.transferAccountId, amt: src.otherAmount != null ? src.otherAmount : -src.amount, memo: src.memo });
   }
@@ -1445,7 +1448,12 @@ function openTxEditor(tx, accountId, startType) {
   // a transfer stored on the receiving side: show the paying side's amount first
   if (xferOther && d.amount > 0) { xferOther = moneyPlain(Math.abs(d.amount)); d.amount = -Math.abs(src.otherAmount); }
   const sgn = () => type === 'dep' ? 1 : -1;
-  let splits = (d.splits && d.splits.length) ? d.splits.map(s => ({ sel: s.transferAccountId ? 't:' + s.transferAccountId : s.categoryId ? 'c:' + s.categoryId : '', memo: s.memo || '', amt: moneyPlain(s.amount * sgn()) })) : null;
+  let splits = (d.splits && d.splits.length) ? d.splits.map(s => ({ sel: s.transferAccountId ? 't:' + s.transferAccountId : s.categoryId ? 'c:' + s.categoryId : '', memo: s.memo || '', amt: moneyPlain(s.amount * sgn()), oamt: s.otherAmount != null ? moneyPlain(Math.abs(s.otherAmount)) : '' })) : null;
+  // a transfer line to an account in another currency also needs the amount that arrives there
+  let catOther = src && type !== 'xfer' && !(d.splits && d.splits.length) && src.otherAmount != null ? moneyPlain(Math.abs(src.otherAmount)) : '', catOtherSuggested = false;
+  const fxTarget = sel => { if (!sel || !sel.startsWith('t:')) return null; const o = I.acc.get(sel.slice(2)); return o && accCur(o) !== accCur(acc) ? o : null; };
+  const suggestOther = (amtText, o) => { const a = parseUserAmount(amtText), rf = rateOf(accCur(acc)), rt = rateOf(accCur(o)); return a != null && a && rf && rt ? moneyPlain(Math.round(Math.abs(a) * rf / rt)) : ''; };
+  const otherLabel = o => `Komt op ${esc(o.name)} binnen als (${accCur(o)})`;
 
   // refresh payee list
   $('#payee-list').innerHTML = Array.from(I.payeeLast.values()).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3000).map(t => `<option value="${esc(t.payee)}">`).join('');
@@ -1538,15 +1546,19 @@ function openTxEditor(tx, accountId, startType) {
   function renderCatArea() {
     const el = $('#cat-area', w);
     if (!splits) {
-      el.innerHTML = `<label>Categorie<div class="row"><select name="cat">${catOptions(curSel, acctId, { noTransfers: !curSel.startsWith('t:') })}</select><button type="button" class="btn small" data-split title="Deze transactie over meerdere categorieën verdelen">Splitsen…</button></div></label>`;
+      const fo = fxTarget(curSel);
+      if (fo && !catOther) { catOther = suggestOther(f.amount.value, fo); catOtherSuggested = !!catOther; }
+      el.innerHTML = `<label>Categorie<div class="row"><select name="cat">${catOptions(curSel, acctId, { noTransfers: !curSel.startsWith('t:') })}</select><button type="button" class="btn small" data-split title="Deze transactie over meerdere categorieën verdelen">Splitsen…</button></div></label>
+        ${fo ? `<label>${otherLabel(fo)} <span class="hint">(het bedrag hierboven is in ${accCur(acc)})</span><input name="catother" inputmode="decimal" value="${esc(catOther)}" placeholder="0${localeDecimal()}00"></label>` : ''}`;
       const sel = $('select[name=cat]', el);
       sel.onchange = () => {
         if (sel.value === '__new') handleNewCat(sel, v => { if (v) curSel = v; renderCatArea(); });
-        else curSel = sel.value;
+        else { const was = !!fxTarget(curSel); curSel = sel.value; if (was || fxTarget(curSel)) { if (catOtherSuggested) catOther = ''; renderCatArea(); } }
       };
+      const co = $('input[name=catother]', el); if (co) co.oninput = () => { catOther = co.value; catOtherSuggested = false; };
       $('[data-split]', el).onclick = () => {
         const a = parseUserAmount(f.amount.value);
-        splits = [{ sel: curSel, memo: '', amt: a != null ? moneyPlain(Math.abs(a)) : '' }, { sel: '', memo: '', amt: '' }];
+        splits = [{ sel: curSel, memo: '', amt: a != null ? moneyPlain(Math.abs(a)) : '', oamt: fxTarget(curSel) ? catOther : '' }, { sel: '', memo: '', amt: '', oamt: '' }];
         renderCatArea();
       };
     } else {
@@ -1555,24 +1567,31 @@ function openTxEditor(tx, accountId, startType) {
           <td style="width:45%"><select data-si="${i}" data-f="sel">${catOptions(s.sel, acctId, { transfersFirst: true })}</select></td>
           <td><input data-si="${i}" data-f="memo" value="${esc(s.memo)}" placeholder="Notitie"></td>
           <td class="amt"><input data-si="${i}" data-f="amt" value="${esc(s.amt)}" inputmode="decimal" placeholder="0${localeDecimal()}00"></td>
-          <td><button type="button" class="icon-btn" data-rm="${i}" aria-label="Regel verwijderen">×</button></td></tr>`).join('')}</tbody></table>
+          <td><button type="button" class="icon-btn" data-rm="${i}" aria-label="Regel verwijderen">×</button></td></tr>${fxTarget(s.sel) ? `<tr class="fxline"><td colspan="2" class="hint" style="text-align:right;vertical-align:middle">${otherLabel(fxTarget(s.sel))}</td><td class="amt"><input data-si="${i}" data-f="oamt" value="${esc(s.oamt || '')}" inputmode="decimal" placeholder="${esc(suggestOther(s.amt, fxTarget(s.sel)) || '0' + localeDecimal() + '00')}"></td><td></td></tr>` : ''}`).join('')}</tbody></table>
         <div class="splitsum"><button type="button" class="btn small" data-addline>+ Regel toevoegen</button><button type="button" class="btn small" data-fill>Rest op de laatste regel zetten</button><button type="button" class="btn small" data-unsplit>Splitsen ongedaan maken</button><span id="splitsum"></span></div>`;
       $$('[data-si]', el).forEach(inp => {
         const ev = inp.tagName === 'SELECT' ? 'change' : 'input';
         inp.addEventListener(ev, () => {
           const i = +inp.dataset.si, fld = inp.dataset.f;
           if (fld === 'sel' && inp.value === '__new') { handleNewCat(inp, v => { if (v) splits[i].sel = v; renderCatArea(); }); return; }
-          splits[i][fld] = inp.value; updateSplitSum();
+          const wasFx = fld === 'sel' && !!fxTarget(splits[i].sel);
+          splits[i][fld] = inp.value;
+          if (fld === 'oamt') splits[i].oSug = false;
+          if (fld === 'sel' && (wasFx || fxTarget(inp.value))) { if (splits[i].oSug || !fxTarget(inp.value)) splits[i].oamt = ''; renderCatArea(); return; }
+          if (fld === 'amt') { const o = fxTarget(splits[i].sel), oi = $(`input[data-si="${i}"][data-f="oamt"]`, el); if (o && oi) { const sg = suggestOther(inp.value, o); oi.placeholder = sg || '0' + localeDecimal() + '00'; if (splits[i].oSug || !splits[i].oamt) { splits[i].oamt = sg; splits[i].oSug = !!sg; oi.value = sg; } } }
+          updateSplitSum();
         });
       });
       $$('[data-rm]', el).forEach(b => b.onclick = () => { splits.splice(+b.dataset.rm, 1); if (!splits.length) splits = null; renderCatArea(); });
-      $('[data-addline]', el).onclick = () => { splits.push({ sel: '', memo: '', amt: '' }); renderCatArea(); };
-      $('[data-unsplit]', el).onclick = () => { curSel = splits[0] ? splits[0].sel : ''; splits = null; renderCatArea(); };
+      $('[data-addline]', el).onclick = () => { splits.push({ sel: '', memo: '', amt: '', oamt: '' }); renderCatArea(); };
+      $('[data-unsplit]', el).onclick = () => { curSel = splits[0] ? splits[0].sel : ''; catOther = splits[0] && fxTarget(curSel) ? splits[0].oamt || '' : ''; splits = null; renderCatArea(); };
       $('[data-fill]', el).onclick = () => {
         const total = parseUserAmount(f.amount.value);
         if (total == null) return;
         const others = splits.slice(0, -1).reduce((s, x) => s + (parseUserAmount(x.amt) || 0), 0);
-        splits[splits.length - 1].amt = moneyPlain(Math.abs(total) - others); renderCatArea();
+        const last = splits[splits.length - 1]; last.amt = moneyPlain(Math.abs(total) - others);
+        if (fxTarget(last.sel) && (last.oSug || !last.oamt)) { last.oamt = suggestOther(last.amt, fxTarget(last.sel)); last.oSug = !!last.oamt; }
+        renderCatArea();
       };
       updateSplitSum();
     }
@@ -1586,6 +1605,7 @@ function openTxEditor(tx, accountId, startType) {
     el.innerHTML = left === 0 ? `<span style="color:var(--pos)">✓ De regels tellen op tot het bedrag</span>` : `Nog te verdelen: <b class="${left < 0 ? 'neg' : ''}">${esc(money(left))}</b>`;
   }
   f.amount.addEventListener('input', updateSplitSum);
+  f.amount.addEventListener('input', () => { const co = $('input[name=catother]', w), fo = fxTarget(curSel); if (co && fo && (catOtherSuggested || !co.value)) { catOther = suggestOther(f.amount.value, fo); catOtherSuggested = !!catOther; co.value = catOther; } });
   f.amount.addEventListener('input', () => { const xo = $('input[name=xother]', w); if (xo && (xo.dataset.suggested || !xo.value)) { xferOther = ''; renderXferArea(); } });
   renderCatArea();
   updateSeg();
@@ -1619,17 +1639,23 @@ function openTxEditor(tx, accountId, startType) {
     let amt = parseUserAmount(f.amount.value);
     let outSplits = null;
     if (splits) {
-      const lines = splits.map(s => ({ sel: s.sel, memo: s.memo.trim(), v: parseUserAmount(s.amt) })).filter(s => s.v);
+      const lines = splits.map(s => ({ sel: s.sel, memo: s.memo.trim(), v: parseUserAmount(s.amt), o: fxTarget(s.sel) ? parseUserAmount(s.oamt) : null })).filter(s => s.v);
+      const noO = lines.find(l => fxTarget(l.sel) && !l.o);
+      if (noO) { err.textContent = `Vul bij de regel naar ${fxTarget(noO.sel).name} ook het bedrag in ${accCur(fxTarget(noO.sel))} in (andere valuta).`; return false; }
       if (!lines.length) { err.textContent = 'Vul op ten minste één regel een bedrag in.'; return false; }
       const sum = lines.reduce((s, x) => s + x.v, 0);
       if (amt == null) { amt = sum; f.amount.value = moneyPlain(sum); }
       if (sum !== Math.abs(amt)) { err.textContent = `De regels tellen op tot ${money(sum)}, maar het bedrag is ${money(Math.abs(amt))}. Pas een regel aan of gebruik “Rest op de laatste regel zetten”.`; return false; }
-      if (lines.length === 1) { curSel = lines[0].sel; }
-      else outSplits = lines.map(l => ({ categoryId: l.sel.startsWith('c:') ? l.sel.slice(2) : null, transferAccountId: l.sel.startsWith('t:') ? l.sel.slice(2) : null, memo: l.memo, amount: l.v * sgn() }));
+      if (lines.length === 1) { curSel = lines[0].sel; catOther = lines[0].o ? moneyPlain(Math.abs(lines[0].o)) : ''; }
+      else outSplits = lines.map(l => { const o = { categoryId: l.sel.startsWith('c:') ? l.sel.slice(2) : null, transferAccountId: l.sel.startsWith('t:') ? l.sel.slice(2) : null, memo: l.memo, amount: l.v * sgn() }; if (l.o) o.otherAmount = -sgn() * Math.abs(l.o); return o; });
     }
     if (amt == null) { err.textContent = 'Vul een bedrag in.'; f.amount.focus(); return false; }
     if (amt === 0 && !d.ob) { err.textContent = 'Het bedrag kan niet nul zijn.'; return false; }
     let otherAmt = null;
+    if (type !== 'xfer' && !outSplits && fxTarget(curSel)) {
+      const o = parseUserAmount(catOther); if (o == null || !o) { err.textContent = `Vul ook het bedrag in dat op ${fxTarget(curSel).name} binnenkomt, in ${accCur(fxTarget(curSel))} (andere valuta).`; return false; }
+      otherAmt = -sgn() * Math.abs(o);
+    }
     if (type === 'xfer') {
       if (!xferFrom || !xferTo) { err.textContent = 'Kies beide rekeningen voor de overboeking.'; return false; }
       if (accCur(idx().acc.get(xferFrom)) !== accCur(idx().acc.get(xferTo))) {
@@ -1647,7 +1673,7 @@ function openTxEditor(tx, accountId, startType) {
     };
     let t;
     if (isNew) t = newTx(fields); else { t = DB.transactions.find(x => x.id === src.id); if (t.otherAmount != null && (fields.amount !== src.amount || fields.accountId !== src.accountId || fields.transferAccountId !== src.transferAccountId)) delete t.otherAmount; Object.assign(t, fields); }
-    if (type === 'xfer') { if (otherAmt != null) t.otherAmount = otherAmt; else delete t.otherAmount; }
+    if (otherAmt != null) t.otherAmount = otherAmt; else delete t.otherAmount;
     syncLegs(t);
     lastEnteredDate = date;
     changed();
