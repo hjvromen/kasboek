@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.27 (oktober 2026)';
+const APP_VERSION = '1.28 (november 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -1004,6 +1004,60 @@ function txCategoryLabel(t) {
 }
 function txCategoryText(t) { const d = document.createElement('div'); d.innerHTML = txCategoryLabel(t); return d.textContent; }
 function accName(id) { const a = idx().acc.get(id); return a ? a.name : ''; }
+/* an account by its name, or by a name it had before (so imports keep finding a renamed account) */
+function accByName(name) {
+  const k = String(name || '').trim().toLowerCase(); if (!k) return null;
+  return DB.accounts.find(a => a.name.toLowerCase() === k) || DB.accounts.find(a => (a.aliases || []).some(x => x.toLowerCase() === k)) || null;
+}
+/* merge account `from` into account `to`: transactions that `to` already has are dropped, the rest moves over */
+function planMerge(from, to) {
+  const I = idx();
+  const counter = t => {
+    let c;
+    if (t.ob) c = 'ob';
+    else if (t.linkId) { const src = I.tx.get(t.linkId); c = src ? src.accountId : '?'; }
+    else if (t.transferAccountId) c = t.transferAccountId;
+    else if (t.splits && t.splits.length) c = 'split';
+    else c = 'cat';
+    return c === from.id ? to.id : c;
+  };
+  const key = t => t.date + '|' + t.amount + '|' + counter(t);
+  const pool = new Map();
+  for (const t of I.byAcc.get(to.id) || []) { const k = key(t); if (!pool.has(k)) pool.set(k, []); pool.get(k).push(t); }
+  const dup = [], move = [];
+  for (const t of (I.byAcc.get(from.id) || []).slice().sort(cmpTx)) {
+    const list = pool.get(key(t));
+    if (list && list.length) {
+      // a duplicate leg whose source is a split on another account: only safe to remove when that account holds the same split twice
+      if (t.linkId) { const src = I.tx.get(t.linkId); if (src && src.splits && src.splits.length && !(I.byAcc.get(src.accountId) || []).some(x => x !== src && !x.linkId && x.date === src.date && x.amount === src.amount && x.splits && x.splits.length)) { move.push(t); continue; } }
+      list.shift(); dup.push(t);
+    } else move.push(t);
+  }
+  return { dup, move };
+}
+function doMerge(from, to) {
+  const { dup, move } = planMerge(from, to);
+  const I = idx(), drop = new Set();
+  for (const t of dup) {
+    if (t.linkId) { drop.add(t.linkId); for (const l of I.legsOf.get(t.linkId) || []) drop.add(l.id); }
+    else { drop.add(t.id); for (const l of I.legsOf.get(t.id) || []) drop.add(l.id); }
+  }
+  DB.transactions = DB.transactions.filter(t => !drop.has(t.id));
+  for (const t of DB.transactions) {
+    if (t.accountId === from.id) t.accountId = to.id;
+    if (t.transferAccountId === from.id) t.transferAccountId = to.id;
+    if (t.splits) for (const x of t.splits) if (x.transferAccountId === from.id) x.transferAccountId = to.id;
+  }
+  to.aliases = Array.from(new Set([...(to.aliases || []), from.name, ...(from.aliases || [])])).filter(n => n.toLowerCase() !== to.name.toLowerCase());
+  if (!to.iban && from.iban) to.iban = from.iban;
+  DB.accounts = DB.accounts.filter(a => a !== from);
+  // transfers between the two accounts are now within one account: drop those pairs
+  _idx = null;
+  const self = DB.transactions.filter(t => !t.linkId && t.transferAccountId === to.id && t.accountId === to.id && !(t.splits && t.splits.length));
+  if (self.length) { const ids = new Set(self.map(t => t.id)); DB.transactions = DB.transactions.filter(t => !ids.has(t.id) && !ids.has(t.linkId)); }
+  repairLinks();
+  return { dup: dup.length, moved: move.length };
+}
 
 /* ---------- UI state & routing ---------- */
 let state = { view: 'home' };
@@ -1707,7 +1761,7 @@ function openAccountEditor(acc) {
     <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="openitems" ${usesOpenItems(a) ? 'checked' : ''} style="width:auto;min-height:0"> Open posten bijhouden (afletteren), bijvoorbeeld voor kruisposten</label>
     ${!isNew ? `<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="closed" ${a.closed ? 'checked' : ''} style="width:auto;min-height:0"> Deze rekening is opgeheven (niet meer in de lijst tonen)</label>` : ''}
     <div class="err"></div>
-    <div class="modal-actions">${!isNew ? '<button type="button" class="btn danger" data-del>Rekening verwijderen</button>' : ''}<span class="spacer"></span><button type="button" class="btn" data-close>Annuleren</button><button class="btn primary">${isNew ? 'Rekening toevoegen' : 'Opslaan'}</button></div>
+    <div class="modal-actions">${!isNew ? '<button type="button" class="btn danger" data-del>Rekening verwijderen</button><button type="button" class="btn" data-merge title="Deze rekening opgaan in een andere rekening; dubbele transacties worden opgeruimd">Samenvoegen met…</button>' : ''}<span class="spacer"></span><button type="button" class="btn" data-close>Annuleren</button><button class="btn primary">${isNew ? 'Rekening toevoegen' : 'Opslaan'}</button></div>
   </form>`
   });
   const f = $('form', w);
@@ -1717,7 +1771,7 @@ function openAccountEditor(acc) {
     e.preventDefault();
     const name = f.name.value.trim();
     if (!name) { $('.err', w).textContent = 'Vul een naam in.'; return; }
-    if (DB.accounts.some(x => x !== acc && x.name.toLowerCase() === name.toLowerCase())) { $('.err', w).textContent = 'Er is al een rekening met deze naam.'; return; }
+    if (DB.accounts.some(x => x !== acc && x.name.toLowerCase() === name.toLowerCase())) { $('.err', w).textContent = 'Er is al een rekening met deze naam. Wilt u de twee rekeningen samenvoegen? Gebruik dan “Samenvoegen met…”.'; return; }
     if (isNew) {
       const na = { id: uid(), name, type: f.type.value, note: f.note.value.trim(), iban: normIban(f.iban.value), openItems: f.openitems.checked, currency: f.currency.value, closed: false };
       DB.accounts.push(na);
@@ -1726,11 +1780,14 @@ function openAccountEditor(acc) {
       if (ob) newTx({ accountId: na.id, date: f.obdate.value || todayISO(), amount: ob, payee: 'Beginsaldo', ob: true, status: 'R' });
       changed(); closeModal(w); go('account', { accountId: na.id });
     } else {
+      if (acc.name !== name) acc.aliases = Array.from(new Set([...(acc.aliases || []), acc.name])).filter(n => n.toLowerCase() !== name.toLowerCase());
       Object.assign(acc, { name, type: f.type.value, note: f.note.value.trim(), iban: normIban(f.iban.value), openItems: f.openitems.checked, currency: f.currency.value, closed: f.closed.checked });
       resetFormats();
       changed(); closeModal(w); render();
     }
   };
+  const mg = $('[data-merge]', w);
+  if (mg) mg.onclick = () => { closeModal(w); openMerge(acc); };
   const del = $('[data-del]', w);
   if (del) del.onclick = async () => {
     if (!await confirmBox('“' + acc.name + '” verwijderen?', `<p>Hiermee verwijdert u de rekening${n ? ` en de <b>${n.toLocaleString('nl-NL')}</b> transacties` : ''}. Overboekingen vanaf andere rekeningen naar deze rekening blijven bij die rekeningen staan, maar krijgen geen categorie.</p><p>Gebruikt u de rekening alleen niet meer, dan kunt u hem beter markeren als <b>opgeheven</b>.</p>`, 'Rekening verwijderen', true)) return;
@@ -1742,6 +1799,33 @@ function openAccountEditor(acc) {
     }
     DB.accounts = DB.accounts.filter(x => x !== acc);
     changed(); closeModal(w); go('home');
+  };
+}
+
+function openMerge(acc) {
+  const others = DB.accounts.filter(a => a !== acc).sort((a, b) => a.name.localeCompare(b.name));
+  const guess = others.find(a => (a.aliases || []).some(x => x.toLowerCase() === acc.name.toLowerCase())) || others.find(a => accCur(a) === accCur(acc) && a.type === acc.type) || others[0];
+  const w = openModal({ title: '“' + esc(acc.name) + '” samenvoegen', body: `
+    <p class="sub" style="margin-top:0">Alle transacties van <b>${esc(acc.name)}</b> gaan naar de rekening die u hieronder kiest; daarna verdwijnt “${esc(acc.name)}”. Transacties die op beide rekeningen staan (dezelfde datum, hetzelfde bedrag, dezelfde tegenrekening of categorie) worden maar één keer bewaard. Ook de dubbele overboekingen op uw andere rekeningen worden dan opgeruimd.</p>
+    <label>Samenvoegen met<select name="to">${others.map(a => `<option value="${a.id}" ${a === guess ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></label>
+    <div id="mergeprev" class="card" style="margin:10px 0;padding:12px 14px"></div>
+    <p class="hint">Kasboek slaat eerst een reservekopie op in uw map Downloads, zodat u terug kunt als het resultaat u niet bevalt.</p>
+    <div class="modal-actions"><span class="spacer"></span><button type="button" class="btn" data-close>Annuleren</button><button type="button" class="btn primary" data-go-merge>Samenvoegen</button></div>` });
+  const sel = $('select[name=to]', w);
+  const prev = () => {
+    const to = idx().acc.get(sel.value), { dup, move } = planMerge(acc, to);
+    const cur = accCur(acc) !== accCur(to);
+    $('#mergeprev', w).innerHTML = `<div><b>${dup.length.toLocaleString('nl-NL')}</b> transacties staan al op ${esc(to.name)} en worden als dubbel verwijderd (met hun tegenboekingen op andere rekeningen).</div>
+      <div><b>${move.length.toLocaleString('nl-NL')}</b> transacties worden naar ${esc(to.name)} verplaatst.</div>
+      ${cur ? `<div class="neg" style="margin-top:6px">Let op: de rekeningen hebben een andere valuta (${accCur(acc)} en ${accCur(to)}).</div>` : ''}`;
+  };
+  sel.onchange = prev; prev();
+  $('[data-go-merge]', w).onclick = () => {
+    const to = idx().acc.get(sel.value); if (!to) return;
+    saveBackup();
+    const r = doMerge(acc, to);
+    changed(); closeModal(w); go('account', { accountId: to.id });
+    toast(`Samengevoegd: ${r.dup.toLocaleString('nl-NL')} dubbele transacties opgeruimd, ${r.moved.toLocaleString('nl-NL')} verplaatst.`);
   };
 }
 
@@ -2402,7 +2486,7 @@ async function readQifFiles(files) {
       const obName = qifOpeningName(g.records);
       const guess = g.qifName || obName;
       const name = guess || base;
-      const existing = DB.accounts.find(a => a.name.toLowerCase() === name.toLowerCase());
+      const existing = accByName(name);
       const ds = g.records.map(r => r.D).filter(Boolean);
       return { qifName: name, obName, fromFile: !guess, type: qifAcctType(g.qifType), records: g.records, target: existing ? existing.id : 'new', newName: name, firstDate: ds[0], lastDate: ds[ds.length - 1] };
     });
@@ -2443,7 +2527,7 @@ function runImport(plan) {
   const resolveAcc = name => {
     const k = name.toLowerCase();
     if (nameMap.has(k)) return nameMap.get(k);
-    let a = DB.accounts.find(x => x.name.toLowerCase() === k);
+    let a = accByName(k);
     if (!a) { a = { id: uid(), name, type: 'checking', note: '', closed: false }; DB.accounts.push(a); st.autoAccounts.push(name); }
     nameMap.set(k, a.id); return a.id;
   };
