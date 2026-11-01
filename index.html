@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.28 (november 2026)';
+const APP_VERSION = '1.29 (november 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -896,6 +896,49 @@ function saveBackup() {
   toast('Reservekopie opgeslagen in uw map Downloads.');
 }
 function openBackup() { $('#file-backup').value = ''; $('#file-backup').click(); }
+function applyBackupData(d) {
+  DB = Object.assign(emptyDB(), d); DB.settings = Object.assign(emptyDB().settings, d.settings || {});
+  resetFormats(); applyTheme(); changed(); state = { view: 'home' }; render();
+}
+
+/* ---------- restore points: automatic copies kept inside Kasboek (in this browser, per administratie) ----------
+   one per day (the first time Kasboek opens that day) and one before every risky action */
+let SNAPS = [];
+const SNAP_REASONS = { daily: 'Dagelijks', import: 'Vóór importeren', merge: 'Vóór samenvoegen van rekeningen', restore: 'Vóór terugzetten', delaccount: 'Vóór verwijderen van een rekening', erase: 'Vóór alles wissen' };
+async function packStr(str) { try { if (window.CompressionStream) return await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'))).blob(); } catch (e) {} return str; }
+async function unpackStr(v) { return typeof v === 'string' ? v : await new Response(v.stream().pipeThrough(new DecompressionStream('gzip'))).text(); }
+async function loadSnaps() { try { const l = idbHandle && await idbGet(K('snaps')); SNAPS = Array.isArray(l) ? l : []; } catch (e) { SNAPS = []; } }
+async function takeSnapshot(reason) {
+  if (!idbHandle || (!DB.transactions.length && !DB.accounts.length)) return null;
+  try {
+    const id = uid();
+    await idbPut(K('snap:' + id), await packStr(JSON.stringify(DB)));
+    SNAPS.unshift({ id, at: new Date().toISOString(), day: todayISO(), reason, accounts: DB.accounts.length, tx: DB.transactions.length });
+    // keep the last 14 daily copies and the last 10 made before an action
+    let d = 0, o = 0; const keep = [], drop = [];
+    for (const x of SNAPS) ((x.reason === 'daily' ? ++d <= 14 : ++o <= 10) ? keep : drop).push(x);
+    SNAPS = keep; await idbPut(K('snaps'), SNAPS);
+    for (const x of drop) await idbDel(K('snap:' + x.id));
+    return id;
+  } catch (e) { return null; }
+}
+async function dailySnapshot() { if (!SNAPS.some(x => x.reason === 'daily' && x.day === todayISO())) { await takeSnapshot('daily'); if (state.view === 'settings') render(); } }
+async function readSnapshot(id) { const v = await idbGet(K('snap:' + id)); if (!v) throw new Error('Dit herstelpunt is niet meer beschikbaar.'); return JSON.parse(await unpackStr(v)); }
+const snapWhen = x => { const dt = new Date(x.at); return fmtDate(x.day || x.at.slice(0, 10)) + ' ' + dt.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }); };
+async function restoreSnapshot(id) {
+  const x = SNAPS.find(y => y.id === id); if (!x) return;
+  let d; try { d = await readSnapshot(id); } catch (e) { return alertBox('Terugzetten lukt niet', esc(e.message)); }
+  const ok = await confirmBox('Terugzetten naar ' + snapWhen(x) + '?', `<p>Kasboek gaat terug naar de stand van <b>${snapWhen(x)}</b> (${esc(SNAP_REASONS[x.reason] || x.reason)}): ${d.accounts.length} rekeningen en ${d.transactions.length.toLocaleString('nl-NL')} transacties.</p><p>Alles wat daarna is veranderd verdwijnt${fileHandle && fileStatus === 'ok' ? ', ook uit het gedeelde bestand en dus op de andere computer' : ''}. De huidige stand wordt eerst zelf als herstelpunt bewaard, zodat u ook dit weer ongedaan kunt maken.</p>`, 'Terugzetten', true);
+  if (!ok) return;
+  await takeSnapshot('restore');
+  applyBackupData(d);
+  toast('Teruggezet naar de stand van ' + snapWhen(x) + '.');
+}
+async function downloadSnapshot(id) {
+  const x = SNAPS.find(y => y.id === id); if (!x) return;
+  try { const d = await readSnapshot(id); download('Kasboek herstelpunt ' + (BOOKS.length > 1 || BOOK !== 'main' ? bookName() + ' ' : '') + (x.day || x.at.slice(0, 10)) + '.json', JSON.stringify(d, null, 1), 'application/json'); }
+  catch (e) { alertBox('Opslaan lukt niet', esc(e.message)); }
+}
 $('#file-backup').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
   let d;
@@ -903,8 +946,8 @@ $('#file-backup').addEventListener('change', async e => {
   if (!d || d.app !== 'kasboek' || !Array.isArray(d.transactions)) return alertBox('Dat bestand kan niet worden gelezen', 'Het lijkt geen reservekopie van Kasboek te zijn.');
   const ok = await confirmBox('Deze reservekopie openen?', `<p>De reservekopie bevat <b>${d.accounts.length}</b> rekeningen en <b>${d.transactions.length.toLocaleString('nl-NL')}</b> transacties.</p><p>Hij <b>vervangt</b> alles wat nu in Kasboek staat. Twijfelt u, sla dan eerst een reservekopie van de huidige gegevens op.</p>`, 'Vervangen door reservekopie', true);
   if (!ok) return;
-  DB = Object.assign(emptyDB(), d); DB.settings = Object.assign(emptyDB().settings, d.settings || {});
-  resetFormats(); applyTheme(); changed(); state = { view: 'home' }; render();
+  await takeSnapshot('restore');
+  applyBackupData(d);
   toast('Reservekopie geopend.');
 });
 
@@ -1791,6 +1834,7 @@ function openAccountEditor(acc) {
   const del = $('[data-del]', w);
   if (del) del.onclick = async () => {
     if (!await confirmBox('“' + acc.name + '” verwijderen?', `<p>Hiermee verwijdert u de rekening${n ? ` en de <b>${n.toLocaleString('nl-NL')}</b> transacties` : ''}. Overboekingen vanaf andere rekeningen naar deze rekening blijven bij die rekeningen staan, maar krijgen geen categorie.</p><p>Gebruikt u de rekening alleen niet meer, dan kunt u hem beter markeren als <b>opgeheven</b>.</p>`, 'Rekening verwijderen', true)) return;
+    await takeSnapshot('delaccount');
     const gone = new Set(DB.transactions.filter(t => t.accountId === acc.id).map(t => t.id));
     DB.transactions = DB.transactions.filter(t => !gone.has(t.id) && !(t.linkId && gone.has(t.linkId)));
     for (const t of DB.transactions) {
@@ -1809,7 +1853,7 @@ function openMerge(acc) {
     <p class="sub" style="margin-top:0">Alle transacties van <b>${esc(acc.name)}</b> gaan naar de rekening die u hieronder kiest; daarna verdwijnt “${esc(acc.name)}”. Transacties die op beide rekeningen staan (dezelfde datum, hetzelfde bedrag, dezelfde tegenrekening of categorie) worden maar één keer bewaard. Ook de dubbele overboekingen op uw andere rekeningen worden dan opgeruimd.</p>
     <label>Samenvoegen met<select name="to">${others.map(a => `<option value="${a.id}" ${a === guess ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></label>
     <div id="mergeprev" class="card" style="margin:10px 0;padding:12px 14px"></div>
-    <p class="hint">Kasboek slaat eerst een reservekopie op in uw map Downloads, zodat u terug kunt als het resultaat u niet bevalt.</p>
+    <p class="hint">Kasboek bewaart eerst een herstelpunt (Instellingen › Herstelpunten), zodat u terug kunt als het resultaat u niet bevalt.</p>
     <div class="modal-actions"><span class="spacer"></span><button type="button" class="btn" data-close>Annuleren</button><button type="button" class="btn primary" data-go-merge>Samenvoegen</button></div>` });
   const sel = $('select[name=to]', w);
   const prev = () => {
@@ -1820,9 +1864,9 @@ function openMerge(acc) {
       ${cur ? `<div class="neg" style="margin-top:6px">Let op: de rekeningen hebben een andere valuta (${accCur(acc)} en ${accCur(to)}).</div>` : ''}`;
   };
   sel.onchange = prev; prev();
-  $('[data-go-merge]', w).onclick = () => {
+  $('[data-go-merge]', w).onclick = async () => {
     const to = idx().acc.get(sel.value); if (!to) return;
-    saveBackup();
+    await takeSnapshot('merge');
     const r = doMerge(acc, to);
     changed(); closeModal(w); go('account', { accountId: to.id });
     toast(`Samengevoegd: ${r.dup.toLocaleString('nl-NL')} dubbele transacties opgeruimd, ${r.moved.toLocaleString('nl-NL')} verplaatst.`);
@@ -2333,6 +2377,12 @@ function viewSettings() {
     <div class="card"><h2>Reservekopie</h2>
       <p class="sub" style="margin-top:0">Kasboek bewaart elke wijziging automatisch in deze browser op deze computer. Een reservekopie is uw vangnet: sla er regelmatig een op en bewaar een exemplaar ergens anders (bijvoorbeeld op iCloud Drive of een USB-stick). Laatste reservekopie: <b>${esc(last)}</b>.</p>
       <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-act="save-backup">Reservekopie opslaan</button><button class="btn" data-act="open-backup">Reservekopie openen…</button></div>
+    </div>
+    <div class="card"><h2>Herstelpunten</h2>
+      <p class="sub" style="margin-top:0">Kasboek bewaart zelf een kopie van uw gegevens: elke dag de eerste keer dat u het opent (de laatste 14 dagen), en vlak voor importeren, samenvoegen, terugzetten, een rekening verwijderen of alles wissen (de laatste 10). Gaat er iets mis, zet dan hier de stand van dat moment terug. Herstelpunten staan alleen in deze browser op deze computer; een reservekopie op een andere plek blijft dus verstandig.</p>
+      ${SNAPS.length ? `<table class="t"><thead><tr><th>Moment</th><th>Aanleiding</th><th class="num">Transacties</th><th></th></tr></thead><tbody>
+        ${SNAPS.map(x => `<tr><td style="white-space:nowrap">${esc(snapWhen(x))}</td><td>${esc(SNAP_REASONS[x.reason] || x.reason)}</td><td class="num">${x.tx.toLocaleString('nl-NL')}</td><td class="num" style="white-space:nowrap"><button class="btn small" data-snap-dl="${x.id}" title="Als reservekopie-bestand opslaan in Downloads">Als bestand</button> <button class="btn small" data-snap-restore="${x.id}">Terugzetten…</button></td></tr>`).join('')}
+        </tbody></table>` : '<p class="muted">Nog geen herstelpunten. Het eerste wordt gemaakt zodra er gegevens in Kasboek staan.</p>'}
     </div>
     <div class="card"><h2>Weergave</h2>
       <div class="grid2">
@@ -3223,6 +3273,8 @@ function afterRender() {
   const sc = $('#set-cur'); if (sc) sc.onchange = () => { DB.settings.currency = sc.value; resetFormats(); changed(); render(); };
   const sl = $('#set-loc'); if (sl) sl.onchange = () => { DB.settings.locale = sl.value; resetFormats(); changed(); render(); };
   $$('[data-rate]').forEach(inp => inp.onchange = () => { const v = parseFloat(String(inp.value).replace(',', '.')); DB.settings.rates = DB.settings.rates || {}; if (v > 0) DB.settings.rates[inp.dataset.rate] = { rate: v, date: todayISO(), source: 'zelf' }; else delete DB.settings.rates[inp.dataset.rate]; resetFormats(); changed(); render(); });
+  $$('[data-snap-restore]').forEach(b => b.onclick = () => restoreSnapshot(b.dataset.snapRestore));
+  $$('[data-snap-dl]').forEach(b => b.onclick = () => downloadSnapshot(b.dataset.snapDl));
   $$('[data-userate]').forEach(b => b.onclick = () => { const [c, r] = b.dataset.userate.split(':'); DB.settings.rates = DB.settings.rates || {}; DB.settings.rates[c] = { rate: +r, date: todayISO(), source: 'overboeking' }; resetFormats(); changed(); render(); });
   const sth = $('#set-theme'); if (sth) sth.onchange = () => { DB.settings.theme = sth.value; applyTheme(); changed(); };
   $$('[data-csv]').forEach(el => el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => {
@@ -3357,6 +3409,7 @@ document.addEventListener('click', async e => {
     case 'pick-csv': $('#file-csv').value = ''; return $('#file-csv').click();
     case 'csv-cancel': csvPlan = null; return render();
     case 'csv-run': {
+      await takeSnapshot('import');
       const st = runCsvImport(csvPlan); csvPlan = null;
       go('home');
       alertBox('Importeren voltooid', `<p><b>${st.tx.toLocaleString('nl-NL')}</b> transacties geïmporteerd${st.cat ? `, waarvan <b>${st.cat.toLocaleString('nl-NL')}</b> met een categorie of als overboeking` : ''}.</p>
@@ -3370,6 +3423,7 @@ document.addEventListener('click', async e => {
     }
     case 'imp-cancel': importPlan = null; return render();
     case 'imp-run': {
+      await takeSnapshot('import');
       const st = runImport(importPlan); importPlan = null;
       go('home');
       alertBox('Importeren voltooid', `<p><b>${st.tx.toLocaleString('nl-NL')}</b> transacties geïmporteerd${st.matched ? `, <b>${st.matched.toLocaleString('nl-NL')}</b> overboekingen gekoppeld aan de andere rekening` : ''}.</p>
@@ -3392,6 +3446,7 @@ document.addEventListener('click', async e => {
     }
     case 'erase': {
       if (!await confirmBox('Alle gegevens wissen?', fileHandle && fileStatus === 'ok' ? '<p><b>U gebruikt een gedeeld gegevensbestand.</b> Hiermee verwijdert u alle rekeningen, categorieën en transacties uit dat bestand, dus ook op de andere computer. Reservekopieën die u hebt opgeslagen blijven bestaan.</p>' : '<p>Hiermee verwijdert u alle rekeningen, categorieën en transacties uit Kasboek op deze computer. Reservekopieën die u hebt opgeslagen blijven bestaan.</p>', 'Alles wissen', true)) return;
+      await takeSnapshot('erase');
       const keep = DB.settings; DB = emptyDB(); DB.settings = keep; changed(); return go('home');
     }
   }
@@ -3420,8 +3475,10 @@ $('#file-qif').addEventListener('change', async e => {
     catch (e) { fileStatus = 'needs-permission'; }
   }
   render();
+  await loadSnaps(); dailySnapshot();
   if (fileHandle && fileStatus === 'ok') syncFile();
   setInterval(checkForOtherComputer, 15000);
+  window.addEventListener('focus', () => dailySnapshot());
   checkForUpdate(); setInterval(checkForUpdate, 30 * 60000);
   setTimeout(autoRates, 4000);
   window.addEventListener('focus', checkForUpdate);
