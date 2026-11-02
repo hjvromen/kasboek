@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.29 (november 2026)';
+const APP_VERSION = '1.30 (november 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -1298,7 +1298,7 @@ function viewHome() {
     ${backupBanner()}
     ${missingRates().length ? `<div class="banner"><span class="grow"><b>Wisselkoers ontbreekt voor ${missingRates().join(', ')}.</b> Tot u die invult, telt Kasboek die rekeningen 1 op 1 mee in uw vermogen.</span><button class="btn small" data-go="settings">Koersen instellen</button></div>` : ''}
     ${(() => { const n = uncatList().length; return n ? `<div class="banner info"><span class="grow"><b>${n.toLocaleString('nl-NL')} transacties hebben nog geen categorie.</b> Ze tellen in de rapporten mee als “Zonder categorie”.</span><button class="btn small primary" data-go="uncat">Nakijken</button></div>` : ''; })()}
-    <div class="head"><div class="grow"><div class="sub">Vermogen</div><div class="hero ${net < 0 ? 'neg' : ''}">${esc(money(net))}</div></div>
+    <div class="head"><div class="grow"><h1>Overzicht</h1></div>
       <button class="btn primary" data-act="new-tx-any">+ Nieuwe transactie</button></div>
     <div class="cols2">
       <div class="card"><div class="row" style="align-items:baseline;flex-wrap:wrap"><h2 style="flex:1">Rekeningen</h2><label class="zerotoggle" style="padding:0"><input type="checkbox" data-hidezero-home ${sideHideZero ? 'checked' : ''}> Saldo ${esc(money(0))} verbergen</label></div><table class="t">${accHTML}</table>${zeroHidden ? `<p class="hint" style="margin-top:8px">${zeroHidden} ${zeroHidden === 1 ? 'rekening' : 'rekeningen'} met saldo ${esc(money(0))} verborgen.</p>` : ''}</div>
@@ -1562,7 +1562,7 @@ function openTxEditor(tx, accountId, startType) {
       <div class="seg"><button type="button" data-type="pay">Uitgave (af)</button><button type="button" data-type="dep">Ontvangst (bij)</button>${d.ob ? '' : '<button type="button" data-type="xfer">Overboeking (tussen rekeningen)</button>'}</div>
       <div class="grid2">
         <label>Datum<input type="date" name="date" value="${esc(d.date)}" required></label>
-        <label>Nummer <span class="hint">optioneel (kenmerk, referentie)</span><input name="num" value="${esc(d.num)}"></label>
+        <input type="hidden" name="num" value="${esc(d.num)}">
       </div>
       <div id="xfer-area"></div>
       <label><span id="payee-label">Begunstigde</span><input name="payee" list="payee-list" value="${esc(d.payee)}" ${isNew ? 'autofocus' : ''} placeholder="Aan wie betaalde u, of wie betaalde u?"></label>
