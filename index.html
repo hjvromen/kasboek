@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.31 (november 2026)';
+const APP_VERSION = '1.32 (november 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -1252,12 +1252,12 @@ function viewUncat() {
       <td>${split ? `<button class="btn small" data-uopen="${t.id}">Gesplitst — regels aanvullen…</button>` : `<select data-ucat="${t.id}" style="min-width:220px">${catOptions('', t.accountId, { noneLabel: '— Kies een categorie —' })}</select>`}</td></tr>`;
   }).join('');
   return `<div class="page">
-    <div class="head"><div class="grow"><h1>Zonder categorie</h1><p class="sub">${total ? `${total.toLocaleString('nl-NL')} transacties hebben nog geen categorie. Kies er hier een; Kasboek onthoudt hem voor volgende imports van dezelfde begunstigde.` : 'Alle transacties hebben een categorie. 🎉'}</p></div></div>
+    <div class="head"><div class="grow"><h1>Zonder categorie</h1><p class="sub">${total ? `${total.toLocaleString('nl-NL')} transacties hebben nog geen categorie. Kies er hier een; Kasboek onthoudt hem voor volgende imports van dezelfde tegenpartij.` : 'Alle transacties hebben een categorie. 🎉'}</p></div></div>
     ${offer}
-    ${total ? `<div class="toolbar"><input type="search" id="u-search" placeholder="Zoek op begunstigde, notitie, bedrag…" value="${esc(us.search)}">
+    ${total ? `<div class="toolbar"><input type="search" id="u-search" placeholder="Zoek op tegenpartij, notitie, bedrag…" value="${esc(us.search)}">
       <select id="u-acc"><option value="all">Alle rekeningen</option>${accsWith.map(a => `<option value="${a.id}" ${us.account === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>
       <span class="grow"></span><span class="muted" style="font-size:13px">${list.length.toLocaleString('nl-NL')} getoond</span></div>
-    <div class="card" style="padding:4px 6px"><table class="t"><thead><tr><th>Datum</th><th>Rekening</th><th>Begunstigde / notitie</th><th class="num">Bedrag</th><th>Categorie</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="card" style="padding:4px 6px"><table class="t"><thead><tr><th>Datum</th><th>Rekening</th><th>Tegenpartij / notitie</th><th class="num">Bedrag</th><th>Categorie</th></tr></thead><tbody>${rows}</tbody></table>
     ${list.length > us.shown ? `<div class="more"><button class="btn" data-act="uncat-more">Meer tonen (nog ${(list.length - us.shown).toLocaleString('nl-NL')})</button></div>` : ''}</div>` : ''}
   </div>`;
 }
@@ -1314,7 +1314,7 @@ function viewHome() {
       </div>
     </div>
     <div class="card" style="margin-top:16px"><h2>Laatste transacties</h2>
-      ${recent.length ? `<table class="t"><thead><tr><th>Datum</th><th>Rekening</th><th>Begunstigde</th><th>Categorie</th><th class="num">Bedrag</th></tr></thead><tbody>
+      ${recent.length ? `<table class="t"><thead><tr><th>Datum</th><th>Rekening</th><th>Tegenpartij</th><th>Categorie</th><th class="num">Bedrag</th></tr></thead><tbody>
       ${recent.map(t => `<tr class="click" data-acc="${t.accountId}"><td>${fmtDate(t.date)}</td><td>${esc(accName(t.accountId))}</td><td>${esc(t.payee)}</td><td class="cat">${txCategoryLabel(t)}</td><td class="num">${moneyHTML(t.amount)}</td></tr>`).join('')}
       </tbody></table>` : '<p class="muted">Nog geen transacties.</p>'}
     </div>
@@ -1444,7 +1444,7 @@ function viewRegisterInner() {
     </div>
     ${reconHTML}${kpHTML}
     ${inRecon ? '' : `<div class="toolbar">
-      <input type="search" id="reg-search" placeholder="Zoek op begunstigde, notitie, categorie, bedrag…" value="${esc(regState.search)}">
+      <input type="search" id="reg-search" placeholder="Zoek op tegenpartij, notitie, categorie, bedrag…" value="${esc(regState.search)}">
       <select id="reg-period">${PERIODS.map(([k, l]) => `<option value="${k}" ${regState.period === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
       ${regState.period === 'custom' ? `<input type="date" id="reg-from" value="${esc((regState.custom || {}).from || '')}"> t/m <input type="date" id="reg-to" value="${esc((regState.custom || {}).to || '')}">` : ''}
       <span class="grow"></span>
@@ -1452,7 +1452,7 @@ function viewRegisterInner() {
       <button class="btn small" data-act="reg-csv">Exporteren naar spreadsheet</button>
     </div>`}
     <div class="card" style="padding:4px 6px">
-    ${rows.length ? `<table class="t reg"><thead><tr>${kp ? '<th class="st" title="Afletteren">🔗</th>' : ''}<th class="st" title="Status">${inRecon ? '✓' : 'C'}</th><th>Datum</th><th class="numcol">Nr.</th><th>Begunstigde / notitie</th><th>Categorie</th><th class="num">Af</th><th class="num">Bij</th>${inRecon || (kp && kpState.view === 'open') ? '' : '<th class="num">Saldo</th>'}</tr></thead><tbody>${body}</tbody></table>
+    ${rows.length ? `<table class="t reg"><thead><tr>${kp ? '<th class="st" title="Afletteren">🔗</th>' : ''}<th class="st" title="Status">${inRecon ? '✓' : 'C'}</th><th>Datum</th><th class="numcol">Nr.</th><th>Tegenpartij / notitie</th><th>Categorie</th><th class="num">Af</th><th class="num">Bij</th>${inRecon || (kp && kpState.view === 'open') ? '' : '<th class="num">Saldo</th>'}</tr></thead><tbody>${body}</tbody></table>
       ${rows.length > shown.length ? `<div class="more"><button class="btn" data-act="show-more">Oudere transacties tonen (nog ${(rows.length - shown.length).toLocaleString('nl-NL')})</button></div>` : ''}`
     : `<p class="muted" style="padding:18px">${all.length ? (kp && kpState.view === 'open' ? 'Er staan geen open posten meer. 🎉' : 'Geen transacties gevonden.') : 'Nog geen transacties. Klik op “Nieuwe transactie” om er een toe te voegen.'}</p>`}
     </div>
@@ -1463,7 +1463,7 @@ function exportRegisterCSV() {
   const I = idx(), a = I.acc.get(state.accountId); if (!a) return;
   const all = I.byAcc.get(a.id) || [];
   let run = 0;
-  const rows = [['Datum', 'Nummer', 'Begunstigde', 'Categorie', 'Notitie', 'Status', 'Bedrag', 'Saldo']];
+  const rows = [['Datum', 'Nummer', 'Tegenpartij', 'Categorie', 'Notitie', 'Status', 'Bedrag', 'Saldo']];
   const [from, to] = periodRange(regState.period, regState.custom);
   for (const t of all) {
     run += t.amount;
@@ -2120,7 +2120,7 @@ function txForCategories(from, to, accountId, ids) {
 function showGridCell(label, ids, from, to, when) {
   const list = txForCategories(from, to, reportState.account, ids);
   const total = list.reduce((s, x) => s + x.amount, 0);
-  const w = openModal({ wide: true, title: esc(label) + ' — ' + esc(when), body: list.length ? `<table class="t"><thead><tr><th>Datum</th><th>Rekening</th><th>Begunstigde</th><th>Notitie</th><th class="num">Bedrag</th></tr></thead><tbody>
+  const w = openModal({ wide: true, title: esc(label) + ' — ' + esc(when), body: list.length ? `<table class="t"><thead><tr><th>Datum</th><th>Rekening</th><th>Tegenpartij</th><th>Notitie</th><th class="num">Bedrag</th></tr></thead><tbody>
     ${list.map(x => `<tr class="click" data-goacc="${x.t.accountId}"><td>${fmtDate(x.t.date)}</td><td>${esc(accName(x.t.accountId))}</td><td>${esc(x.t.payee)}</td><td class="muted">${esc(x.memo)}</td><td class="num">${moneyHTML(x.amount)}</td></tr>`).join('')}
     </tbody><tfoot><tr><td colspan="4">Totaal (${list.length} transacties)</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>` : '<p class="muted">Geen transacties.</p>' });
   $$('[data-goacc]', w).forEach(r => r.onclick = () => { closeModal(w); go('account', { accountId: r.dataset.goacc }); });
@@ -2160,10 +2160,10 @@ function viewReports() {
       const total = list.reduce((s, x) => s + x.amount, 0);
       const lab = rs.drill2 === '_in' || rs.drill2 === '_out' ? 'Zonder categorie' : catName(rs.drill2);
       content = `<div class="crumbs"><button class="btn link" data-rdrill="">Alle categorieën</button>${rs.drill ? ` › <button class="btn link" data-rdrill="${esc(rs.drill)}">${esc(catName(rs.drill))}</button>` : ''} › ${esc(lab)}</div>
-        <table class="t"><thead><tr><th>Datum</th><th>Rekening</th><th>Begunstigde</th><th>Notitie</th><th class="num">Bedrag</th></tr></thead><tbody>
+        <table class="t"><thead><tr><th>Datum</th><th>Rekening</th><th>Tegenpartij</th><th>Notitie</th><th class="num">Bedrag</th></tr></thead><tbody>
         ${list.map(x => `<tr class="click" data-acc="${x.t.accountId}"><td>${fmtDate(x.t.date)}</td><td>${esc(accName(x.t.accountId))}</td><td>${esc(x.t.payee)}</td><td class="muted">${esc(x.memo)}</td><td class="num">${moneyHTML(x.amount)}</td></tr>`).join('')}
         </tbody><tfoot><tr><td colspan="4">Totaal (${list.length} transacties)</td><td class="num">${moneyHTML(total)}</td></tr></tfoot></table>`;
-      csv = [['Datum', 'Rekening', 'Begunstigde', 'Notitie', 'Bedrag']].concat(list.map(x => [fmtDate(x.t.date), accName(x.t.accountId), x.t.payee, x.memo, moneyPlain(x.amount)]));
+      csv = [['Datum', 'Rekening', 'Tegenpartij', 'Notitie', 'Bedrag']].concat(list.map(x => [fmtDate(x.t.date), accName(x.t.accountId), x.t.payee, x.memo, moneyPlain(x.amount)]));
     } else {
       const rows = spendingRows(flows, rs.drill, kind);
       const total = rows.reduce((s, r) => s + r.value, 0);
@@ -3100,7 +3100,7 @@ function qifPreview(g, f) {
     return `<tr><td>${d ? fmtDate(d) : '<span class="neg">' + esc(r.D || '?') + '</span>'}</td><td>${esc(r.P || '')}</td><td class="num">${a != null ? moneyHTML(a) : '<span class="neg">?</span>'}</td><td>${what}</td></tr>`;
   }).join('');
   return `<details style="margin:6px 0 10px"><summary>Voorbeeld: ${counts.cat.toLocaleString('nl-NL')} met categorie, ${counts.split.toLocaleString('nl-NL')} gesplitst, ${counts.xfer.toLocaleString('nl-NL')} overboekingen, ${counts.none.toLocaleString('nl-NL')} zonder categorie</summary>
-    <table class="t" style="margin-top:6px"><thead><tr><th>Datum</th><th>Begunstigde</th><th class="num">Bedrag</th><th>Categorie in het bestand</th></tr></thead><tbody>${rows}</tbody></table></details>`;
+    <table class="t" style="margin-top:6px"><thead><tr><th>Datum</th><th>Tegenpartij</th><th class="num">Bedrag</th><th>Categorie in het bestand</th></tr></thead><tbody>${rows}</tbody></table></details>`;
 }
 function viewImport() {
   const p = importPlan;
