@@ -259,7 +259,7 @@ details summary{cursor:pointer;color:var(--accent)}
    All data stays on this computer (browser storage + backup files).
    =================================================================== */
 
-const APP_VERSION = '1.30 (november 2026)';
+const APP_VERSION = '1.31 (november 2026)';
 
 /* ---------- installable app (when opened from its web address) ---------- */
 const IS_WEB = /^https?:$/.test(location.protocol);
@@ -1620,8 +1620,8 @@ function openTxEditor(tx, accountId, startType) {
     $$('.seg button', w).forEach(b => b.classList.toggle('on', b.dataset.type === type));
     const x = type === 'xfer';
     $('#cat-area', w).style.display = x ? 'none' : '';
-    $('#payee-label', w).innerHTML = x ? 'Omschrijving <span class="hint">optioneel</span>' : 'Begunstigde';
-    f.payee.placeholder = x ? 'bijv. Maandelijks sparen' : 'Aan wie betaalde u, of wie betaalde u?';
+    $('#payee-label', w).innerHTML = x ? 'Omschrijving <span class="hint">optioneel</span>' : type === 'dep' ? 'Ontvangen van' : 'Begunstigde';
+    f.payee.placeholder = x ? 'bijv. Maandelijks sparen' : type === 'dep' ? 'Van wie ontving u het geld? bijv. werkgever' : 'Aan wie betaalde u?';
     renderXferArea();
   }
   $$('.seg button', w).forEach(b => b.onclick = () => {
